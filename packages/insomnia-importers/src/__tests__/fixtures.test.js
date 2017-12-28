@@ -1,12 +1,9 @@
-'use strict';
-
 const fs = require('fs');
 const path = require('path');
 
 const importers = require('../../index');
 const fixturesPath = path.join(__dirname, './fixtures');
 const fixtures = fs.readdirSync(fixturesPath);
-
 
 describe('Fixtures', () => {
   for (const name of fixtures) {
@@ -19,7 +16,6 @@ describe('Fixtures', () => {
       const output = `${prefix}-output.json`;
 
       it(`Import ${name} ${input}`, () => {
-
         expect(typeof input).toBe('string');
         expect(typeof output).toBe('string');
 
@@ -35,7 +31,7 @@ describe('Fixtures', () => {
         expected.__export_date = results.data.__export_date;
 
         expect(results.data).toEqual(expected);
-      })
+      });
     }
   }
 });

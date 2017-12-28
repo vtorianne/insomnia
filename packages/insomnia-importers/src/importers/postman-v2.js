@@ -30,12 +30,12 @@ function importCollection (collection) {
     _id: `__GRP_${requestGroupCount++}__`,
     _type: 'request_group',
     name: collection.info.name,
-    description: collection.info.description,
+    description: collection.info.description
   };
   return [
     collectionFolder,
     ...importItem(collection.item, collectionFolder._id)
-  ]
+  ];
 }
 
 function importItem (items, parentId = '__WORKSPACE_ID__') {
@@ -66,8 +66,8 @@ function importFolderItem (item, parentId) {
     _id: `__GRP_${requestGroupCount++}__`,
     _type: 'request_group',
     name: item.name,
-    description: item.description || '',
-  }
+    description: item.description || ''
+  };
 }
 
 function importRequestItem (item, parentId) {
@@ -81,15 +81,15 @@ function importRequestItem (item, parentId) {
     url: importUrl(request.url),
     method: request.method || 'GET',
     headers: mapImporter(request.header, importHeader),
-    body: importBody(request.body),
-  }
+    body: importBody(request.body)
+  };
 }
 
 function importHeader (header) {
   return Object.assign({
     name: header.key,
-    value: header.value,
-  })
+    value: header.value
+  });
 }
 
 function importUrl (url) {
@@ -108,12 +108,12 @@ function importBody (body) {
   if (!body) {
     return {};
   } else if (body.mode === 'raw') {
-    return importBodyRaw(body.raw)
+    return importBodyRaw(body.raw);
   } else if (body.mode === 'urlencoded') {
-    return importBodyFormUrlEncoded(body.urlencoded)
+    return importBodyFormUrlEncoded(body.urlencoded);
   } else if (body.mode === 'formdata') {
     // TODO: Handle this as properly as multipart/form-data
-    return importBodyFormdata(body.formdata)
+    return importBodyFormdata(body.formdata);
   } else {
     return {};
   }
@@ -138,8 +138,8 @@ function importBodyFormdata (formdata) {
 
   return {
     params,
-    mimeType: 'multipart/form-data',
-  }
+    mimeType: 'multipart/form-data'
+  };
 }
 
 function importBodyFormUrlEncoded (urlEncoded) {
@@ -151,8 +151,8 @@ function importBodyFormUrlEncoded (urlEncoded) {
 
   return {
     params,
-    mimeType: 'application/x-www-form-urlencoded',
-  }
+    mimeType: 'application/x-www-form-urlencoded'
+  };
 }
 
 function importBodyRaw (raw) {
@@ -166,6 +166,6 @@ function mapImporter (arr, importFn) {
   if (!arr) {
     return [];
   } else {
-    return arr.map(importFn)
+    return arr.map(importFn);
   }
 }

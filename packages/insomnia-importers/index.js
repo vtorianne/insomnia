@@ -4,7 +4,8 @@ const importers = [
   require('./src/importers/insomnia-1'),
   require('./src/importers/insomnia-2'),
   require('./src/importers/insomnia-3'),
-  require('./src/importers/postman'),
+  require('./src/importers/postman-v1'),
+  require('./src/importers/postman-v2'),
   require('./src/importers/postman-env'),
   require('./src/importers/har'),
   require('./src/importers/curl')
@@ -26,9 +27,9 @@ module.exports.convert = function (contents) {
           __export_format: 3,
           __export_date: utils.getDateString(),
           __export_source: 'insomnia.importers:v0.1.0',
-          resources: resources.map(utils.setDefaults),
+          resources: resources.map(utils.setDefaults)
         }
-      }
+      };
     }
   }
 

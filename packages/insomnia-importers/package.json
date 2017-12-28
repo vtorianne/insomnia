@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "commander": "^2.9.0",
+    "postman-collection": "^3.0.6",
     "shell-quote": "^1.6.1"
   }
 }

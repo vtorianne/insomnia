@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "semistandard"
+  ],
+  "plugins": ["jest", "filenames"],
+  "globals": {},
+  "env": {
+    "jest/globals": true
+  },
+  "rules": {
+    "no-var": "error",
+    "no-duplicate-imports": "off",
+    "filenames/match-exported": ["error", "kebab"]
+  }
+}
