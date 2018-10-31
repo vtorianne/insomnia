@@ -8,7 +8,8 @@ const importers = [
   require('./src/importers/postman-env'),
   require('./src/importers/har'),
   require('./src/importers/curl'),
-  require('./src/importers/swagger2')
+  require('./src/importers/swagger2'),
+  require('./src/importers/wadl')
 ];
 
 module.exports.convert = async function(contents) {
