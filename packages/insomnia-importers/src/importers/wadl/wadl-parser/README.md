@@ -16,30 +16,32 @@ Below is a sample output. The JavaScript object returned upon successfull parsin
 {
     base: "https://resources.base",
     requests: [
-      "method": "POST",
-      "url": "https://resources.base/foo/bar",
-      "body": {
-        "text": "{'foo': 'bar'}",
-        "mimeType": "multipart/form-data",
-        "params": [
-          {
-          "name": "foo",
-          "value": "bar"
-          }
-        ]
-      },
-      "parameters": [
-        {
-          "name": "foo",
-          "value": "bar"
-        }
-      ],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ]
+      {
+          "method": "POST",
+          "url": "https://resources.base/foo/bar",
+          "body": {
+            "text": "{'foo': 'bar'}",
+            "mimeType": "multipart/form-data",
+            "params": [
+              {
+                "name": "foo",
+                "value": "bar"
+              }
+            ]
+          },
+          "parameters": [
+            {
+                "name": "foo",
+                "value": "bar"
+            }
+          ],
+          "headers": [
+            {
+                "name": "Content-Type",
+                "value": "application/json"
+            }
+          ]
+      }
     ]
 }
 ```
