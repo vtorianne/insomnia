@@ -38,10 +38,10 @@ Below is the list of ignored attributes organized by their parent element. (Note
   - Repeating
 - Option
   - MediaType
+
+And here are the ignored elements.
   
-  And here are the ignored elements.
-  
-  - Doc
-  - Link
-  _ Response
+- Doc
+- Link
+_ Response
 
