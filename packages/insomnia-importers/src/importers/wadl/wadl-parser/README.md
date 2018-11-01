@@ -17,28 +17,28 @@ Below is a sample output. The JavaScript object returned upon successfull parsin
     base: "https://resources.base",
     requests: [
       {
-          "method": "POST",
-          "url": "https://resources.base/foo/bar",
-          "body": {
-            "text": "{'foo': 'bar'}",
-            "mimeType": "multipart/form-data",
-            "params": [
+          method: "POST",
+          url: "https://resources.base/foo/bar",
+          body: {
+            text: "{'foo': 'bar'}",
+            mimeType: "multipart/form-data",
+            params: [
               {
-                "name": "foo",
-                "value": "bar"
+                name: "foo",
+                value: "bar"
               }
             ]
           },
-          "parameters": [
+          parameters: [
             {
-                "name": "foo",
-                "value": "bar"
+                name: "foo",
+                value: "bar"
             }
           ],
-          "headers": [
+          headers: [
             {
-                "name": "Content-Type",
-                "value": "application/json"
+                name: "Content-Type",
+                value: "application/json"
             }
           ]
       }
