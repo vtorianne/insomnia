@@ -43,5 +43,5 @@ And here are the ignored elements.
   
 - Doc
 - Link
-_ Response
+- Response
 
