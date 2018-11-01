@@ -1,14 +1,48 @@
-# WADL Parser #
+# WADL to Request Parser #
 
-This module takes WADL xml input text and extracts request information, returning it as a js object. 
-It is designed with REST API testing in mind.
+This module takes WADL formatted XML input text, extracts request information, generates default values for paramaters, returns a JavaScript object. It is designed with what would be needed for REST API testing in mind.
 
 ## Setup ##
 Node.js is required.
 
 ## Input ##
+The parser takes a WADL XML formatted string, Please see the WADL coverage section to see what areas this parser processes.
 
 ## Output ##
+Below is a sample output. The JavaScript object returned upon successfull parsing containes a field for the resources base url and an array of request objects. If the parsing is successful, the output will be null.
+
+
+```js
+{
+    base: "https://resources.base",
+    requests: [
+      "method": "POST",
+      "url": "https://resources.base/foo/bar",
+      "body": {
+        "text": "{'foo': 'bar'}",
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+          "name": "foo",
+          "value": "bar"
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "name": "foo",
+          "value": "bar"
+        }
+      ],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    ]
+}
+```
 
 ## Usage ##
 
@@ -23,7 +57,7 @@ Another is the [grammars](https://www.w3.org/Submission/wadl/#x3-90002.4) elemen
 ### Non-Supported Elements & Attributes ### 
 This module does not parse all elements and attributes and thus some are ignored. These ignored items either do not affect the extracted request information or are simply not supported.
 
-Below is the list of ignored attributes organized by their parent element. (Note the parent elements and their other non-listed attributes *are* supported).
+Below is the list of ignored attributes organized by their parent element. (Note the elements and their other non-listed attributes *are* supported).
 
 - Grammars
   - Include
@@ -39,7 +73,7 @@ Below is the list of ignored attributes organized by their parent element. (Note
 - Option
   - MediaType
 
-And here are the ignored elements.
+Below are the elements ignored in their entirety.
   
 - Doc
 - Link
