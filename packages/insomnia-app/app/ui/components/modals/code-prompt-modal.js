@@ -16,6 +16,7 @@ const MODES = {
   'text/plain': 'Plain Text',
   'application/json': 'JSON',
   'application/xml': 'XML',
+  'application/edn': 'EDN',
   'text/x-markdown': 'Markdown',
   'text/html': 'HTML'
 };
@@ -119,9 +120,7 @@ class CodePromptModal extends PureComponent {
                 defaultValue={defaultValue}
                 placeholder={placeholder}
                 onChange={this._handleChange}
-                handleGetRenderContext={
-                  enableRender ? handleGetRenderContext : null
-                }
+                handleGetRenderContext={enableRender ? handleGetRenderContext : null}
                 handleRender={enableRender ? handleRender : null}
                 mode={mode}
                 keyMap={editorKeyMap}
@@ -141,9 +140,7 @@ class CodePromptModal extends PureComponent {
                   placeholder={placeholder}
                   onChange={this._handleChange}
                   nunjucksPowerUserMode={nunjucksPowerUserMode}
-                  getRenderContext={
-                    enableRender ? handleGetRenderContext : null
-                  }
+                  getRenderContext={enableRender ? handleGetRenderContext : null}
                   render={enableRender ? handleRender : null}
                   mode={mode}
                   keyMap={editorKeyMap}
@@ -164,19 +161,14 @@ class CodePromptModal extends PureComponent {
               </DropdownButton>
               <DropdownDivider>Editor Syntax</DropdownDivider>
               {Object.keys(MODES).map(mode => (
-                <DropdownItem
-                  key={mode}
-                  value={mode}
-                  onClick={this._handleChangeMode}>
+                <DropdownItem key={mode} value={mode} onClick={this._handleChangeMode}>
                   <i className="fa fa-code" />
                   {MODES[mode]}
                 </DropdownItem>
               ))}
             </Dropdown>
           ) : null}
-          <div className="margin-left faint italic txt-sm tall">
-            {hint ? `* ${hint}` : ''}
-          </div>
+          <div className="margin-left faint italic txt-sm tall">{hint ? `* ${hint}` : ''}</div>
           <button className="btn" onClick={this.hide}>
             {submitName || 'Submit'}
           </button>

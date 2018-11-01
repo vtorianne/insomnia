@@ -133,6 +133,7 @@ export const PREVIEW_MODES = Object.keys(previewModeMap);
 // Content Types
 export const CONTENT_TYPE_JSON = 'application/json';
 export const CONTENT_TYPE_XML = 'application/xml';
+export const CONTENT_TYPE_EDN = 'application/edn';
 export const CONTENT_TYPE_FORM_URLENCODED = 'application/x-www-form-urlencoded';
 export const CONTENT_TYPE_FORM_DATA = 'multipart/form-data';
 export const CONTENT_TYPE_FILE = 'application/octet-stream';
@@ -146,7 +147,8 @@ const contentTypesMap = {
   [CONTENT_TYPE_FORM_URLENCODED]: ['Form', 'Form URL Encoded'],
   [CONTENT_TYPE_FILE]: ['File', 'Binary File'],
   [CONTENT_TYPE_GRAPHQL]: ['GraphQL', 'GraphQL Query'],
-  [CONTENT_TYPE_OTHER]: ['Other', 'Other']
+  [CONTENT_TYPE_OTHER]: ['Other', 'Other'],
+  [CONTENT_TYPE_EDN]: ['EDN', 'EDN']
 };
 
 // Auth Types
@@ -180,9 +182,7 @@ const authTypesMap = {
 
 export function getPreviewModeName(previewMode, useLong = false) {
   if (previewModeMap.hasOwnProperty(previewMode)) {
-    return useLong
-      ? previewModeMap[previewMode][1]
-      : previewModeMap[previewMode][0];
+    return useLong ? previewModeMap[previewMode][1] : previewModeMap[previewMode][0];
   } else {
     return '';
   }
@@ -194,14 +194,10 @@ export function getContentTypeName(contentType, useLong = false) {
   }
 
   if (contentTypesMap.hasOwnProperty(contentType)) {
-    return useLong
-      ? contentTypesMap[contentType][1]
-      : contentTypesMap[contentType][0];
+    return useLong ? contentTypesMap[contentType][1] : contentTypesMap[contentType][0];
   }
 
-  return useLong
-    ? contentTypesMap[CONTENT_TYPE_OTHER][1]
-    : contentTypesMap[CONTENT_TYPE_OTHER][0];
+  return useLong ? contentTypesMap[CONTENT_TYPE_OTHER][1] : contentTypesMap[CONTENT_TYPE_OTHER][0];
 }
 
 export function getAuthTypeName(authType, useLong = false) {
@@ -217,9 +213,7 @@ export function getContentTypeFromHeaders(headers, defaultValue = null) {
     return null;
   }
 
-  const header = headers.find(
-    ({ name }) => name.toLowerCase() === 'content-type'
-  );
+  const header = headers.find(({ name }) => name.toLowerCase() === 'content-type');
   return header ? header.value : defaultValue;
 }
 

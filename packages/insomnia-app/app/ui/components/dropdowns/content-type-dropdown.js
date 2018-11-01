@@ -1,12 +1,7 @@
 // @flow
 import * as React from 'react';
 import autobind from 'autobind-decorator';
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownDivider,
-  DropdownItem
-} from '../base/dropdown';
+import { Dropdown, DropdownButton, DropdownDivider, DropdownItem } from '../base/dropdown';
 import {
   CONTENT_TYPE_FILE,
   CONTENT_TYPE_FORM_DATA,
@@ -15,6 +10,7 @@ import {
   CONTENT_TYPE_JSON,
   CONTENT_TYPE_OTHER,
   CONTENT_TYPE_XML,
+  CONTENT_TYPE_EDN,
   getContentTypeName
 } from '../../../common/constants';
 import { showModal } from '../modals/index';
@@ -47,8 +43,7 @@ class ContentTypeDropdown extends React.PureComponent<Props> {
     const isEmpty = !hasParams && !hasText && !hasFile;
     const isFile = body.mimeType === CONTENT_TYPE_FILE;
     const isMultipartWithFiles =
-      body.mimeType === CONTENT_TYPE_FORM_DATA &&
-      (body.params || []).find(p => p.type === 'file');
+      body.mimeType === CONTENT_TYPE_FORM_DATA && (body.params || []).find(p => p.type === 'file');
     const isFormUrlEncoded = body.mimeType === CONTENT_TYPE_FORM_URLENCODED;
     const isText = !isFile && !isMultipartWithFiles;
 
@@ -63,8 +58,7 @@ class ContentTypeDropdown extends React.PureComponent<Props> {
     if (!isEmpty && !willPreserveText && !willPreserveForm) {
       await showModal(AlertModal, {
         title: 'Switch Body Type?',
-        message:
-          'Current body will be lost. Are you sure you want to continue?',
+        message: 'Current body will be lost. Are you sure you want to continue?',
         addCancel: true
       });
     }
@@ -82,9 +76,7 @@ class ContentTypeDropdown extends React.PureComponent<Props> {
 
   _renderDropdownItem(mimeType: string | null, forcedName: string = '') {
     const contentType =
-      typeof this.props.contentType === 'string'
-        ? this.props.contentType
-        : EMPTY_MIME_TYPE;
+      typeof this.props.contentType === 'string' ? this.props.contentType : EMPTY_MIME_TYPE;
 
     const iconClass = mimeType === contentType ? 'fa-check' : 'fa-empty';
 
@@ -116,6 +108,7 @@ class ContentTypeDropdown extends React.PureComponent<Props> {
         </DropdownDivider>
         {this._renderDropdownItem(CONTENT_TYPE_JSON)}
         {this._renderDropdownItem(CONTENT_TYPE_XML)}
+        {this._renderDropdownItem(CONTENT_TYPE_EDN)}
         {this._renderDropdownItem(CONTENT_TYPE_OTHER)}
         <DropdownDivider>
           <span>
