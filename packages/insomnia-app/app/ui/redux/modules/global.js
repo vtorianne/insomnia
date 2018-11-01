@@ -151,9 +151,9 @@ export function importFile(workspaceId) {
             'curl',
             'bash',
             'shell',
-            'xml',
             'yaml',
-            'yml'
+            'yml',
+            'xml'
           ]
         }
       ]
