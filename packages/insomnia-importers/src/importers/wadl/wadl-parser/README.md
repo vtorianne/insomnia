@@ -1,4 +1,4 @@
-# WADL to Request Parser #
+# WADL Request Parser #
 
 This module takes WADL formatted XML input text, extracts request information, generates default values for paramaters, returns a JavaScript object. It is designed with what would be needed for REST API testing in mind.
 
@@ -47,6 +47,16 @@ Below is a sample output. The JavaScript object returned upon successfull parsin
 ```
 
 ## Usage ##
+This module currently has one method (parse) which is asynchronous with a text input parameter and a callback for which to send the output.
+```node.js
+var wadl = require('wadl-parser');
+
+var rawData = "WADL XML";
+await wadl.parse(rawData, function(result) {
+  if (result != null)
+    console.log(result)
+});
+```
 
 ## WADL Coverage ##
 This module processes WADL following the [W3C WADL specs](https://www.w3.org/Submission/wadl/). Many areas, element types, and attributes are covered in this module. However, currently some are not supported, have limited support, or are ignored (i.e. not used for generating the output). 
