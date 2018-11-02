@@ -208,8 +208,6 @@ function parseParam(param, context, parent) {
           paramHelper.parseTemplate(param, context, defaultVal);
           break;
         case 'plain':
-          //?????
-          break;
         default:
           if (parent.type === 'representation') {
             switch (parent.mediaType) {
