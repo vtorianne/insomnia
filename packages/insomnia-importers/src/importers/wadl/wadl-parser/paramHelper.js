@@ -1,6 +1,6 @@
 var xml2js = require('xml2js');
 var simpleType = require('./simpleType');
-var complexType = require('./complexType');
+var xmlSchema = require('./xmlSchema');
 
 module.exports.parseMatrix = function(param, context, defaultVal) {
   try {
@@ -107,7 +107,7 @@ function generateObj(name, type) {
   var obj = {};
   var typeInfo = type.split(':');
   if (typeInfo[0] === 'tns') {
-    obj[name] = complexType.generateDefault(typeInfo[1]);
+    obj[name] = xmlSchema.generateDefault(typeInfo[1]);
   } else {
     obj[name] = simpleType.generateDefault(type);
   }

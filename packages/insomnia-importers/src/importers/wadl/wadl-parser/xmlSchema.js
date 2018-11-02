@@ -1,26 +1,45 @@
 var simpleType = require('./simpleType');
 
-var types = {};
+var rootElements = {};
+var rootComplexTypes = {};
 var initialized = false;
 
-module.exports.init = function(complexTypes) {
+module.exports.init = function(schema) {
   try {
-    for (var i = 0; i < complexTypes.length; ++i) {
-      //create hash map with type name as key and complex type obj as value
-      types[complexTypes[i].$.name] = complexTypes[i];
-    }
+    parseSchema(schema);
     initialized = true;
   } catch (err) {
     console.log(err);
   }
 };
 
-module.exports.generateDefault = function(complexType) {
+function parseSchema(schema) {
+  if (schema.complexType) {
+    for (var i = 0; i < schema.complexType.length; ++i) {
+      //create hash map with type name as key and complex type obj as value
+      rootComplexTypes[schema.complexType[i].$.name] = schema.complexType[i];
+    }
+  }
+  if (schema.element) {
+    for (var i = 0; i < schema.element.length; ++i) {
+      rootElements[schema.element[i].$.name] = schema.element[i];
+    }
+  }
+}
+
+//check for root level elements
+module.exports.generateDefault = function(schemaElem) {
   try {
-    if (!initialized || !types[complexType]) {
+    if (!initialized) {
       return {};
     }
-    return parseComplexType(types[complexType]);
+    if (rootComplexTypes[schemaElem]) {
+      return parseComplexType(rootComplexTypes[schemaElem]);
+    }
+    if (rootElements[schemaElem]) {
+      return parseElement(rootElements[schemaElem]);
+    }
+    return {};
   } catch (err) {
     console.log(err);
   }
@@ -68,12 +87,15 @@ function parseSequence(sequence) {
 
 function parseElement(element) {
   try {
+    console.log(element);
     var obj = {};
     var defaultVal;
-    if (element.$.type.startsWith('xs')) {
+    if (element.complexType) {
+      defaultVal = parseComplexType(element.complexType[0]);
+    } else if (element.$.type.startsWith('xs')) {
       defaultVal = simpleType.generateDefault(element.$.type);
     } else if (element.$.type.startsWith('tns')) {
-      var typeObj = types[element.$.type.split(':')[1]];
+      var typeObj = complexTypes[element.$.type.split(':')[1]];
       defaultVal = typeObj ? parseComplexType(typeObj) : {};
     }
     obj[element.$.name] = defaultVal;

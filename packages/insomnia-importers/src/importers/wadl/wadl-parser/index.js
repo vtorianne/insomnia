@@ -1,6 +1,6 @@
 var xml2js = require('xml2js');
 var paramHelper = require('./paramHelper');
-var complexTypeInit = require('./complexType').init;
+var xmlSchema = require('./xmlSchema');
 
 var crossReferences = {
   methods: {},
@@ -65,17 +65,7 @@ function parseApplication(application) {
 
 function parseGrammars(grammars) {
   try {
-    if (grammars.schema) parseSchema(grammars.schema[0]);
-  } catch (err) {
-    console.log(err);
-  }
-}
-
-function parseSchema(schema) {
-  try {
-    if (schema.complexType) {
-      complexTypeInit(schema.complexType);
-    }
+    if (grammars.schema) xmlSchema.init(grammars.schema[0]);
   } catch (err) {
     console.log(err);
   }
