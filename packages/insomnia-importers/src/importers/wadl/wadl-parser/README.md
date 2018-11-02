@@ -64,7 +64,7 @@ This module processes WADL following the [W3C WADL specs](https://www.w3.org/Sub
 ### Limited Areas ###
 One limited area is [cross-referencing](https://www.w3.org/Submission/wadl/#x3-60002.1). While the WADL specification supports both intra-document and inter-document, this module only supports the former. Therefore, if you wish to use this module and your WADL is spread across multiple documents, you would need to have your own logic beforehand for combining the documents and updating element href attributes to ID's instead of URI's.
 
-Another is the [grammars](https://www.w3.org/Submission/wadl/#x3-90002.4) element. Currently, this module only supports a limited subset of XML schema for complex types and no other types of grammars. Specifically, the supported XML elements are: Schema, ComplexType, All, Sequence, and Element. Additionally, it is also limited in that the root element must be a Schema element and its direct chilren must be ComplexType elements.
+Another is the [grammars](https://www.w3.org/Submission/wadl/#x3-90002.4) element. Currently, this module only supports a limited subset of [XML Schema](https://msdn.microsoft.com/en-us/library/ms256142(v=vs.110).aspx) and no other types of grammars. Specifically, the supported XML elements are: Schema, ComplexType, All, Sequence, and Element. Additionally, it is also limited in that the root element must be a Schema element and its direct chilren must be ComplexType elements.
 
 ### Non-Supported Elements & Attributes ### 
 This module does not parse all elements and attributes and thus some are ignored. These ignored items either do not affect the extracted request information or are simply not supported.
