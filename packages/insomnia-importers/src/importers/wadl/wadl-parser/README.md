@@ -6,7 +6,7 @@ This module takes WADL formatted XML input text, extracts request information, g
 Node.js is required.
 
 ## Input ##
-The parser takes a WADL XML formatted string, Please see the WADL coverage section to see what areas this parser processes.
+The parser takes a WADL XML formatted string. Please see the WADL coverage section to see what areas this parser processes.
 
 ## Output ##
 Below is a sample output. The JavaScript object returned upon successfull parsing containes a field for the resources base url and an array of request objects. If the parsing is successful, the output will be null.
