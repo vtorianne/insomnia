@@ -16,10 +16,11 @@ module.exports.parseMatrix = function(param, context, defaultVal) {
   }
 };
 
-module.exports.parseHeader = function(param, context, defaultVal) {
+module.exports.parseHeader = function(param, context) {
   try {
-    //??? have default header map?
-    var header = { name: param.$.name, value: '' };
+    //currently using a string as the value
+    //later on could have default map for different request header types
+    var header = { name: param.$.name, value: 'header_value' };
     if (!context.hasOwnProperty('headers')) {
       context.headers = [];
     }

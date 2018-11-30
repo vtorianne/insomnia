@@ -193,7 +193,7 @@ function parseParam(param, context, parent) {
           paramHelper.parseMatrix(param, context, defaultVal);
           break;
         case 'header':
-          paramHelper.parseHeader(param, context, defaultVal);
+          paramHelper.parseHeader(param, context);
           break;
         case 'query':
           if (parent.type === 'representation') {
