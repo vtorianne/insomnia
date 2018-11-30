@@ -71,6 +71,10 @@ module.exports.parseTemplate = function(param, context, defaultVal) {
   }
 };
 
+module.exports.parseText = function(param, context) {
+  context.body.text = param.$.name;
+};
+
 module.exports.parseJSON = function(param, context) {
   try {
     var obj = generateObj(param.$.name, param.$.type);

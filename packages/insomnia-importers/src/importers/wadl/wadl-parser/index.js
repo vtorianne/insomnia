@@ -222,12 +222,10 @@ function parseParam(param, context, parent) {
                 paramHelper.parseXML(param, context);
                 break;
               default:
-              //parse as raw text???
-              /*if(parent.mediaType.startsWith("text")){
-                                    //???need to handle param name?
-                                    context.body.text = "text";
-                                    //paramHelper.parseRawText(param, context);
-                                }*/
+                //handle text/* media types
+                if (parent.mediaType.startsWith('text')) {
+                  paramHelper.parseText(param, context);
+                }
             }
           }
       }
