@@ -95,7 +95,7 @@ function parseElement(element) {
     } else if (element.$.type.startsWith('xs')) {
       defaultVal = simpleType.generateDefault(element.$.type);
     } else if (element.$.type.startsWith('tns')) {
-      var typeObj = complexTypes[element.$.type.split(':')[1]];
+      var typeObj = rootComplexTypes[element.$.type.split(':')[1]];
       defaultVal = typeObj ? parseComplexType(typeObj) : {};
     }
     obj[element.$.name] = defaultVal;
