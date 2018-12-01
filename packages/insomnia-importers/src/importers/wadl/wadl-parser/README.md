@@ -91,3 +91,10 @@ Below are the elements ignored in their entirety.
 - Link
 - Response
 
+### Supported Media Types ###
+Here are the media types this tool currently supports parsing for:
+- application/x-www-form-urlencoded
+- multipart/form-data
+- application/json
+- application/xml
+- text/*
