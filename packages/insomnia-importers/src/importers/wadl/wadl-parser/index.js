@@ -257,7 +257,7 @@ function parseMethod(method, context) {
       }
     } else {
       context.method = method.$.name;
-      //handle simple GET request that doesn't require further specification
+      //handle simple requests (e.g. GET) that don't require further specification
       if (!method.request) return context;
       return parseRequest(method.request[0], context);
     }
