@@ -2,6 +2,7 @@ import * as packageJSON from '../../package.json';
 import * as electron from 'electron';
 import path from 'path';
 import mkdirp from 'mkdirp';
+import { getDataDirectory } from './misc';
 
 // App Stuff
 
@@ -66,10 +67,7 @@ export const LARGE_RESPONSE_MB = 5;
 export const HUGE_RESPONSE_MB = 100;
 export const FLEXIBLE_URL_REGEX = /^(http|https):\/\/[\wàâäèéêëîïôóœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\-_.]+[/\wàâäèéêëîïôóœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ.\-+=:\][@%^*&!#?;$]*/;
 export const CHECK_FOR_UPDATES_INTERVAL = 1000 * 60 * 60 * 3; // 3 hours
-export const PLUGIN_PATH = path.join(
-  (electron.remote || electron).app.getPath('userData'),
-  'plugins'
-);
+export const PLUGIN_PATH = path.join(getDataDirectory(), 'plugins');
 
 // Hotkeys
 export const MOD_SYM = isMac() ? '⌘' : 'Ctrl';

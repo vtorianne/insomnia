@@ -6,6 +6,7 @@ import NeDB from 'nedb';
 import fsPath from 'path';
 import { DB_PERSIST_INTERVAL } from './constants';
 import uuid from 'uuid';
+import { getDataDirectory } from './misc';
 
 export const CHANGE_INSERT = 'insert';
 export const CHANGE_UPDATE = 'update';
@@ -26,9 +27,7 @@ function allTypes() {
 
 function getDBFilePath(modelType) {
   // NOTE: Do not EVER change this. EVER!
-  const { app } = electron.remote || electron;
-  const basePath = app.getPath('userData');
-  return fsPath.join(basePath, `insomnia.${modelType}.db`);
+  return fsPath.join(getDataDirectory(), `insomnia.${modelType}.db`);
 }
 
 export async function initClient() {
@@ -128,6 +127,12 @@ export async function init(types: Array<string>, config: Object = {}, forceReset
       }
     }
   });
+
+  for (const model of models.all()) {
+    if (typeof model.hookDatabaseInit === 'function') {
+      await model.hookDatabaseInit();
+    }
+  }
 }
 
 // ~~~~~~~~~~~~~~~~ //
