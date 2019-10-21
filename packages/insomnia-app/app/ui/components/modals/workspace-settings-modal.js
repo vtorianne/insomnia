@@ -26,7 +26,8 @@ type Props = {
   handleRender: Function,
   handleGetRenderContext: Function,
   handleRemoveWorkspace: Function,
-  handleDuplicateWorkspace: Function
+  handleDuplicateWorkspace: Function,
+  handleClearAllResponses: Function,
 };
 
 type State = {
@@ -38,7 +39,7 @@ type State = {
   isPrivate: boolean,
   passphrase: string,
   showDescription: boolean,
-  defaultPreviewMode: boolean
+  defaultPreviewMode: boolean,
 };
 
 @autobind
@@ -57,7 +58,7 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
       passphrase: '',
       isPrivate: false,
       showDescription: false,
-      defaultPreviewMode: false
+      defaultPreviewMode: false,
     };
   }
 
@@ -78,6 +79,11 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
     this.hide();
   }
 
+  _handleClearAllResponses() {
+    this.props.handleClearAllResponses();
+    this.hide();
+  }
+
   _handleDuplicateWorkspace() {
     this.props.handleDuplicateWorkspace(() => {
       this.hide();
@@ -92,7 +98,7 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
       pfxPath: '',
       host: '',
       passphrase: '',
-      isPrivate: false
+      isPrivate: false,
     }));
   }
 
@@ -146,20 +152,20 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
       disabled: false,
       cert: crtPath || null,
       key: keyPath || null,
-      pfx: pfxPath || null
+      pfx: pfxPath || null,
     };
 
     await models.clientCertificate.create(certificate);
     this._handleToggleCertificateForm();
   }
 
-  async _handleDeleteCertificate(certificate: ClientCertificate) {
+  static async _handleDeleteCertificate(certificate: ClientCertificate) {
     await models.clientCertificate.remove(certificate);
   }
 
-  async _handleToggleCertificate(certificate: ClientCertificate) {
+  static async _handleToggleCertificate(certificate: ClientCertificate) {
     await models.clientCertificate.update(certificate, {
-      disabled: !certificate.disabled
+      disabled: !certificate.disabled,
     });
   }
 
@@ -168,7 +174,7 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
     this.setState({
       showDescription: hasDescription,
       defaultPreviewMode: hasDescription,
-      showAddCertificateForm: false
+      showAddCertificateForm: false,
     });
 
     this.modal && this.modal.show();
@@ -222,7 +228,7 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
             <button
               className="btn btn--super-compact width-auto"
               title="Enable or disable certificate"
-              onClick={() => this._handleToggleCertificate(certificate)}>
+              onClick={() => WorkspaceSettingsModal._handleToggleCertificate(certificate)}>
               {certificate.disabled ? (
                 <i className="fa fa-square-o" />
               ) : (
@@ -231,9 +237,9 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
             </button>
             <PromptButton
               className="btn btn--super-compact width-auto"
-              confirmMessage=" "
+              confirmMessage=""
               addIcon
-              onClick={() => this._handleDeleteCertificate(certificate)}>
+              onClick={() => WorkspaceSettingsModal._handleDeleteCertificate(certificate)}>
               <i className="fa fa-trash-o" />
             </PromptButton>
           </div>
@@ -253,7 +259,7 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
       handleRender,
       handleGetRenderContext,
       nunjucksPowerUserMode,
-      isVariableUncovered
+      isVariableUncovered,
     } = this.props;
 
     const publicCertificates = clientCertificates.filter(c => !c.isPrivate);
@@ -266,17 +272,17 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
       isPrivate,
       showAddCertificateForm,
       showDescription,
-      defaultPreviewMode
+      defaultPreviewMode,
     } = this.state;
 
     return (
       <ModalBody key={`body::${workspace._id}`} noScroll>
         <Tabs forceRenderTabPanel className="react-tabs">
           <TabList>
-            <Tab>
+            <Tab tabIndex="-1">
               <button>Overview</button>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <button>Client Certificates</button>
             </Tab>
           </TabList>
@@ -331,6 +337,12 @@ class WorkspaceSettingsModal extends React.PureComponent<Props, State> {
                 className="width-auto btn btn--clicky inline-block space-left">
                 <i className="fa fa-copy" /> Duplicate
               </button>
+              <PromptButton
+                onClick={this._handleClearAllResponses}
+                addIcon
+                className="width-auto btn btn--clicky inline-block space-left">
+                <i className="fa fa-trash-o" /> Clear All Responses
+              </PromptButton>
             </div>
           </TabPanel>
           <TabPanel className="react-tabs__tab-panel pad scrollable">

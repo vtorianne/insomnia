@@ -13,7 +13,7 @@ class PromptButton extends PureComponent {
     super(props);
 
     this.state = {
-      state: STATE_DEFAULT
+      state: STATE_DEFAULT,
     };
   }
 
@@ -81,7 +81,10 @@ class PromptButton extends PureComponent {
 
     const { state } = this.state;
 
-    const finalConfirmMessage = (confirmMessage || 'Click to confirm').trim();
+    const finalConfirmMessage = (typeof confirmMessage === 'string'
+      ? confirmMessage
+      : 'Click to confirm'
+    ).trim();
     const finalDoneMessage = doneMessage || 'Done';
 
     let innerMsg;
@@ -120,7 +123,7 @@ PromptButton.propTypes = {
   confirmMessage: PropTypes.string,
   doneMessage: PropTypes.string,
   value: PropTypes.any,
-  tabIndex: PropTypes.number
+  tabIndex: PropTypes.number,
 };
 
 export default PromptButton;

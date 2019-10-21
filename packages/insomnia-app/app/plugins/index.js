@@ -1,5 +1,6 @@
 // @flow
 import mkdirp from 'mkdirp';
+import * as packageJson from '../../package.json';
 import * as models from '../models';
 import fs from 'fs';
 import path from 'path';
@@ -8,48 +9,49 @@ import { resolveHomePath } from '../common/misc';
 import { showError } from '../ui/components/modals/index';
 import type { PluginTemplateTag } from '../templating/extensions/index';
 import type { PluginTheme } from './misc';
+import type { RequestGroup } from '../models/request-group';
+import type { Request } from '../models/request';
 
 export type Plugin = {
   name: string,
   description: string,
   version: string,
   directory: string,
-  module: *
+  module: *,
 };
 
 export type TemplateTag = {
   plugin: Plugin,
-  templateTag: PluginTemplateTag
+  templateTag: PluginTemplateTag,
+};
+
+export type RequestGroupAction = {
+  plugin: Plugin,
+  action: (
+    context: Object,
+    models: {
+      requestGroup: RequestGroup,
+      requests: Array<Request>,
+    },
+  ) => void | Promise<void>,
+  label: string,
+  icon?: string,
 };
 
 export type RequestHook = {
   plugin: Plugin,
-  hook: Function
+  hook: Function,
 };
 
 export type ResponseHook = {
   plugin: Plugin,
-  hook: Function
+  hook: Function,
 };
 
 export type Theme = {
   plugin: Plugin,
-  theme: PluginTheme
+  theme: PluginTheme,
 };
-
-const CORE_PLUGINS = [
-  'insomnia-plugin-base64',
-  'insomnia-plugin-hash',
-  'insomnia-plugin-file',
-  'insomnia-plugin-now',
-  'insomnia-plugin-uuid',
-  'insomnia-plugin-prompt',
-  'insomnia-plugin-request',
-  'insomnia-plugin-response',
-  'insomnia-plugin-jsonpath',
-  'insomnia-plugin-cookie-jar',
-  'insomnia-plugin-core-themes'
-];
 
 let plugins: ?Array<Plugin> = null;
 
@@ -108,7 +110,7 @@ async function _traversePluginPath(pluginMap: Object, allPaths: Array<string>) {
         showError({
           title: 'Plugin Error',
           message: 'Failed to load plugin ' + filename,
-          error: err
+          error: err,
         });
       }
     }
@@ -142,7 +144,7 @@ export async function getPlugins(force: boolean = false): Promise<Array<Plugin>>
       // "name": "module"
     };
 
-    for (const p of CORE_PLUGINS) {
+    for (const p of packageJson.app.plugins) {
       const pluginJson = global.require(`${p}/package.json`);
       const pluginModule = global.require(p);
       pluginMap[pluginJson.name] = _initPlugin(pluginJson, pluginModule);
@@ -154,6 +156,16 @@ export async function getPlugins(force: boolean = false): Promise<Array<Plugin>>
   }
 
   return plugins;
+}
+
+export async function getRequestGroupActions(): Promise<Array<RequestGroupAction>> {
+  let extensions = [];
+  for (const plugin of await getPlugins()) {
+    const actions = plugin.module.requestGroupActions || [];
+    extensions = [...extensions, ...actions.map(p => ({ plugin, ...p }))];
+  }
+
+  return extensions;
 }
 
 export async function getTemplateTags(): Promise<Array<TemplateTag>> {
@@ -203,6 +215,6 @@ function _initPlugin(packageJSON: Object, module: any, path: ?string): Plugin {
     description: packageJSON.description || meta.description || '',
     version: packageJSON.version || 'unknown',
     directory: path || '',
-    module: module
+    module: module,
   };
 }

@@ -8,8 +8,10 @@ import type {
   RequestAuthentication,
   RequestBody,
   RequestHeader,
-  RequestParameter
+  RequestParameter,
 } from '../../models/request';
+import type { SidebarChildObjects } from './sidebar/sidebar-children';
+import SidebarChildren from './sidebar/sidebar-children';
 
 import * as React from 'react';
 import autobind from 'autobind-decorator';
@@ -32,17 +34,23 @@ import SelectModal from './modals/select-modal';
 import RequestCreateModal from './modals/request-create-modal';
 import RequestPane from './request-pane';
 import RequestSwitcherModal from './modals/request-switcher-modal';
-import SetupSyncModal from './modals/setup-sync-modal';
 import SettingsModal from './modals/settings-modal';
 import FilterHelpModal from './modals/filter-help-modal';
 import ResponsePane from './response-pane';
 import RequestSettingsModal from './modals/request-settings-modal';
+import SetupSyncModal from './modals/setup-sync-modal';
+import SyncStagingModal from './modals/sync-staging-modal';
+import SyncMergeModal from './modals/sync-merge-modal';
+import SyncHistoryModal from './modals/sync-history-modal';
+import SyncShareModal from './modals/sync-share-modal';
+import SyncBranchesModal from './modals/sync-branches-modal';
 import RequestRenderErrorModal from './modals/request-render-error-modal';
 import Sidebar from './sidebar/sidebar';
 import WorkspaceEnvironmentsEditModal from './modals/workspace-environments-edit-modal';
 import WorkspaceSettingsModal from './modals/workspace-settings-modal';
 import WorkspaceShareSettingsModal from './modals/workspace-share-settings-modal';
 import CodePromptModal from './modals/code-prompt-modal';
+import * as db from '../../common/database';
 import * as models from '../../models/index';
 import * as importers from 'insomnia-importers';
 import type { CookieJar } from '../../models/cookie-jar';
@@ -50,6 +58,14 @@ import type { Environment } from '../../models/environment';
 import ErrorBoundary from './error-boundary';
 import type { ClientCertificate } from '../../models/client-certificate';
 import MoveRequestGroupModal from './modals/move-request-group-modal';
+import AddKeyCombinationModal from './modals/add-key-combination-modal';
+import ExportRequestsModal from './modals/export-requests-modal';
+import VCS from '../../sync/vcs';
+import type { StatusCandidate } from '../../sync/types';
+import type { RequestMeta } from '../../models/request-meta';
+import type { RequestVersion } from '../../models/request-version';
+import EnvironmentsDropdown from './dropdowns/environments-dropdown';
+import SidebarFilter from './sidebar/sidebar-filter';
 
 type Props = {
   // Helper Functions
@@ -59,6 +75,8 @@ type Props = {
   handleImportFileToWorkspace: Function,
   handleImportUriToWorkspace: Function,
   handleExportFile: Function,
+  handleShowExportRequestsModal: Function,
+  handleExportRequestsToFile: Function,
   handleSetActiveWorkspace: Function,
   handleSetActiveEnvironment: Function,
   handleMoveDoc: Function,
@@ -87,9 +105,11 @@ type Props = {
   handleResetDragPaneHorizontal: Function,
   handleResetDragPaneVertical: Function,
   handleSetRequestGroupCollapsed: Function,
+  handleSetRequestPinned: Function,
   handleSendRequestWithEnvironment: Function,
   handleSendAndDownloadRequestWithEnvironment: Function,
   handleUpdateRequestMimeType: Function,
+  handleUpdateDownloadPath: Function,
 
   // Properties
   loadStartTime: number,
@@ -99,12 +119,16 @@ type Props = {
   responsePreviewMode: string,
   responseFilter: string,
   responseFilterHistory: Array<string>,
+  responseDownloadPath: string | null,
   sidebarWidth: number,
   sidebarHidden: boolean,
   sidebarFilter: string,
-  sidebarChildren: Array<Object>,
+  sidebarChildren: SidebarChildObjects,
   settings: Settings,
   workspaces: Array<Workspace>,
+  requestMetas: Array<RequestMeta>,
+  requests: Array<Request>,
+  requestVersions: Array<RequestVersion>,
   unseenWorkspaces: Array<Workspace>,
   workspaceChildren: Array<Object>,
   environments: Array<Object>,
@@ -114,15 +138,18 @@ type Props = {
   activeEnvironment: Environment | null,
   activeWorkspaceClientCertificates: Array<ClientCertificate>,
   isVariableUncovered: boolean,
+  headerEditorKey: string,
+  vcs: VCS | null,
+  syncItems: Array<StatusCandidate>,
 
   // Optional
-  oAuth2Token: ?OAuth2Token,
-  activeRequest: ?Request,
-  activeResponse: ?Response
+  oAuth2Token: OAuth2Token | null,
+  activeRequest: Request | null,
+  activeResponse: Response | null,
 };
 
 type State = {
-  forceRefreshKey: number
+  forceRefreshKey: number,
 };
 
 const rUpdate = (request, ...args) => {
@@ -140,47 +167,59 @@ class Wrapper extends React.PureComponent<Props, State> {
   constructor(props: any) {
     super(props);
     this.state = {
-      forceRefreshKey: Date.now()
+      forceRefreshKey: Date.now(),
     };
   }
 
   // Request updaters
-  async _handleForceUpdateRequest(patch: Object): Promise<Request> {
-    const newRequest = await rUpdate(this.props.activeRequest, patch);
+  async _handleForceUpdateRequest(r: Request, patch: Object): Promise<Request> {
+    const newRequest = await rUpdate(r, patch);
 
     // Give it a second for the app to render first. If we don't wait, it will refresh
     // on the old request and won't catch the newest one.
+    // TODO: Move this refresh key into redux store so we don't need timeout
     window.setTimeout(this._forceRequestPaneRefresh, 100);
 
     return newRequest;
   }
 
-  _handleUpdateRequestBody(body: RequestBody): Promise<Request> {
-    return rUpdate(this.props.activeRequest, { body });
+  _handleForceUpdateRequestHeaders(r: Request, headers: Array<RequestHeader>): Promise<Request> {
+    return this._handleForceUpdateRequest(r, { headers });
   }
 
-  _handleUpdateRequestMethod(method: string): Promise<Request> {
-    return rUpdate(this.props.activeRequest, { method });
+  static _handleUpdateRequestBody(r: Request, body: RequestBody): Promise<Request> {
+    return rUpdate(r, { body });
   }
 
-  _handleUpdateRequestParameters(parameters: Array<RequestParameter>): Promise<Request> {
-    return rUpdate(this.props.activeRequest, { parameters });
+  static _handleUpdateRequestParameters(
+    r: Request,
+    parameters: Array<RequestParameter>,
+  ): Promise<Request> {
+    return rUpdate(r, { parameters });
   }
 
-  _handleUpdateRequestAuthentication(authentication: RequestAuthentication): Promise<Request> {
-    return rUpdate(this.props.activeRequest, { authentication });
+  static _handleUpdateRequestAuthentication(
+    r: Request,
+    authentication: RequestAuthentication,
+  ): Promise<Request> {
+    return rUpdate(r, { authentication });
   }
 
-  _handleUpdateRequestHeaders(headers: Array<RequestHeader>): Promise<Request> {
-    return rUpdate(this.props.activeRequest, { headers });
+  static _handleUpdateRequestHeaders(r: Request, headers: Array<RequestHeader>): Promise<Request> {
+    return rUpdate(r, { headers });
   }
 
-  _handleForceUpdateRequestHeaders(headers: Array<RequestHeader>): Promise<Request> {
-    return this._handleForceUpdateRequest({ headers });
+  static _handleUpdateRequestMethod(r: Request, method: string): Promise<Request> {
+    return rUpdate(r, { method });
   }
 
-  _handleUpdateRequestUrl(url: string): Promise<Request> {
-    return rUpdate(this.props.activeRequest, { url });
+  static _handleUpdateRequestUrl(r: Request, url: string): Promise<Request> {
+    // Don't update if we don't need to
+    if (r.url === url) {
+      return Promise.resolve(r);
+    }
+
+    return rUpdate(r, { url });
   }
 
   // Special request updaters
@@ -197,15 +236,15 @@ class Wrapper extends React.PureComponent<Props, State> {
       const { resources } = data;
       const r = resources[0];
 
-      if (r && r._type === 'request') {
+      if (r && r._type === 'request' && this.props.activeRequest) {
         // Only pull fields that we want to update
-        return this._handleForceUpdateRequest({
+        return this._handleForceUpdateRequest(this.props.activeRequest, {
           url: r.url,
           method: r.method,
           headers: r.headers,
           body: r.body,
           authentication: r.authentication,
-          parameters: r.parameters
+          parameters: r.parameters,
         });
       }
     } catch (e) {
@@ -233,10 +272,6 @@ class Wrapper extends React.PureComponent<Props, State> {
     this.props.handleImportUriToWorkspace(this.props.activeWorkspace._id, uri);
   }
 
-  _handleExportWorkspaceToFile(): void {
-    this.props.handleExportFile(this.props.activeWorkspace._id);
-  }
-
   _handleSetActiveResponse(responseId: string | null): void {
     if (!this.props.activeRequest) {
       console.warn('Tried to set active response when request not active');
@@ -254,7 +289,7 @@ class Wrapper extends React.PureComponent<Props, State> {
     showModal(CookiesModal, this.props.activeWorkspace);
   }
 
-  _handleShowModifyCookieModal(cookie: Object): void {
+  static _handleShowModifyCookieModal(cookie: Object): void {
     showModal(CookieModifyModal, cookie);
   }
 
@@ -262,13 +297,13 @@ class Wrapper extends React.PureComponent<Props, State> {
     showModal(RequestSettingsModal, { request: this.props.activeRequest });
   }
 
-  _handleDeleteResponses(): void {
+  async _handleDeleteResponses(): Promise<void> {
     if (!this.props.activeRequest) {
       console.warn('Tried to delete responses when request not active');
       return;
     }
 
-    models.response.removeForRequest(this.props.activeRequest._id);
+    await models.response.removeForRequest(this.props.activeRequest._id);
     this._handleSetActiveResponse(null);
   }
 
@@ -288,13 +323,21 @@ class Wrapper extends React.PureComponent<Props, State> {
     if (workspaces.length <= 1) {
       showModal(AlertModal, {
         title: 'Deleting Last Workspace',
-        message: 'Since you deleted your only workspace, a new one has been created for you.'
+        message: 'Since you deleted your only workspace, a new one has been created for you.',
       });
 
       models.workspace.create({ name: 'Insomnia' });
     }
 
     await models.workspace.remove(activeWorkspace);
+  }
+
+  async _handleActiveWorkspaceClearAllResponses(): Promise<void> {
+    const docs = await db.withDescendants(this.props.activeWorkspace, models.request.type);
+    const requests = docs.filter(doc => doc.type === models.request.type);
+    for (const req of requests) {
+      await models.response.removeForRequest(req._id);
+    }
   }
 
   _handleSendRequestWithActiveEnvironment(): void {
@@ -304,15 +347,20 @@ class Wrapper extends React.PureComponent<Props, State> {
     handleSendRequestWithEnvironment(activeRequestId, activeEnvironmentId);
   }
 
-  _handleSendAndDownloadRequestWithActiveEnvironment(filename?: string): void {
+  async _handleSendAndDownloadRequestWithActiveEnvironment(filename?: string): Promise<void> {
     const {
       activeRequest,
       activeEnvironment,
-      handleSendAndDownloadRequestWithEnvironment
+      handleSendAndDownloadRequestWithEnvironment,
     } = this.props;
+
     const activeRequestId = activeRequest ? activeRequest._id : 'n/a';
     const activeEnvironmentId = activeEnvironment ? activeEnvironment._id : 'n/a';
-    handleSendAndDownloadRequestWithEnvironment(activeRequestId, activeEnvironmentId, filename);
+    await handleSendAndDownloadRequestWithEnvironment(
+      activeRequestId,
+      activeEnvironmentId,
+      filename,
+    );
   }
 
   _handleSetPreviewMode(previewMode: string): void {
@@ -327,66 +375,155 @@ class Wrapper extends React.PureComponent<Props, State> {
     this.props.handleSetResponseFilter(activeRequestId, filter);
   }
 
+  _handleCreateRequestInWorkspace() {
+    const { activeWorkspace, handleCreateRequest } = this.props;
+    handleCreateRequest(activeWorkspace._id);
+  }
+
+  _handleCreateRequestGroupInWorkspace() {
+    const { activeWorkspace, handleCreateRequestGroup } = this.props;
+    handleCreateRequestGroup(activeWorkspace._id);
+  }
+
+  _handleChangeEnvironment(id: string) {
+    const { handleSetActiveEnvironment } = this.props;
+    handleSetActiveEnvironment(id);
+  }
+
   _forceRequestPaneRefresh(): void {
     this.setState({ forceRefreshKey: Date.now() });
   }
 
-  render() {
+  renderSidebarBody(): React.Node {
     const {
       activeEnvironment,
       activeRequest,
       activeWorkspace,
-      activeCookieJar,
-      activeRequestResponses,
-      activeResponse,
-      activeWorkspaceClientCertificates,
       environments,
       handleActivateRequest,
+      handleCopyAsCurl,
       handleCreateRequest,
-      handleCreateRequestForWorkspace,
       handleCreateRequestGroup,
       handleDuplicateRequest,
       handleDuplicateRequestGroup,
-      handleMoveRequestGroup,
-      handleExportFile,
+      handleGenerateCode,
       handleMoveDoc,
+      handleMoveRequestGroup,
+      handleSetRequestGroupCollapsed,
+      handleSetRequestPinned,
+      handleSetSidebarFilter,
+      settings,
+      sidebarChildren,
+      sidebarFilter,
+      sidebarWidth,
+      sidebarHidden,
+    } = this.props;
+
+    return (
+      <React.Fragment>
+        <div className="sidebar__menu">
+          <EnvironmentsDropdown
+            handleChangeEnvironment={this._handleChangeEnvironment}
+            activeEnvironment={activeEnvironment}
+            environments={environments}
+            workspace={activeWorkspace}
+            environmentHighlightColorStyle={settings.environmentHighlightColorStyle}
+            hotKeyRegistry={settings.hotKeyRegistry}
+          />
+          <button className="btn btn--super-compact" onClick={this._handleShowCookiesModal}>
+            <div className="sidebar__menu__thing">
+              <span>Cookies</span>
+            </div>
+          </button>
+        </div>
+
+        <SidebarFilter
+          key={`${activeWorkspace._id}::filter`}
+          onChange={handleSetSidebarFilter}
+          requestCreate={this._handleCreateRequestInWorkspace}
+          requestGroupCreate={this._handleCreateRequestGroupInWorkspace}
+          filter={sidebarFilter || ''}
+          hotKeyRegistry={settings.hotKeyRegistry}
+        />
+
+        <SidebarChildren
+          childObjects={sidebarChildren}
+          handleActivateRequest={handleActivateRequest}
+          handleCreateRequest={handleCreateRequest}
+          handleCreateRequestGroup={handleCreateRequestGroup}
+          handleSetRequestGroupCollapsed={handleSetRequestGroupCollapsed}
+          handleSetRequestPinned={handleSetRequestPinned}
+          handleDuplicateRequest={handleDuplicateRequest}
+          handleDuplicateRequestGroup={handleDuplicateRequestGroup}
+          handleMoveRequestGroup={handleMoveRequestGroup}
+          handleGenerateCode={handleGenerateCode}
+          handleCopyAsCurl={handleCopyAsCurl}
+          moveDoc={handleMoveDoc}
+          hidden={sidebarHidden}
+          width={sidebarWidth}
+          workspace={activeWorkspace}
+          activeRequest={activeRequest}
+          filter={sidebarFilter || ''}
+          hotKeyRegistry={settings.hotKeyRegistry}
+          activeEnvironment={activeEnvironment}
+        />
+      </React.Fragment>
+    );
+  }
+
+  render() {
+    const {
+      activeCookieJar,
+      activeEnvironment,
+      activeRequest,
+      activeRequestResponses,
+      activeResponse,
+      activeWorkspace,
+      activeWorkspaceClientCertificates,
+      handleActivateRequest,
+      handleCreateRequestForWorkspace,
+      handleDuplicateWorkspace,
+      handleExportFile,
+      handleExportRequestsToFile,
+      handleGenerateCodeForActiveRequest,
+      handleGetRenderContext,
+      handleRender,
       handleResetDragPaneHorizontal,
       handleResetDragPaneVertical,
       handleResetDragSidebar,
       handleSetActiveEnvironment,
       handleSetActiveWorkspace,
-      handleSetRequestGroupCollapsed,
       handleSetRequestPaneRef,
       handleSetResponsePaneRef,
       handleSetSidebarRef,
+      handleShowExportRequestsModal,
       handleStartDragPaneHorizontal,
       handleStartDragPaneVertical,
-      handleSetSidebarFilter,
       handleToggleMenuBar,
-      handleRender,
-      handleGetRenderContext,
-      handleDuplicateWorkspace,
-      handleGenerateCodeForActiveRequest,
-      handleGenerateCode,
-      handleCopyAsCurl,
+      handleUpdateDownloadPath,
       handleUpdateRequestMimeType,
+      headerEditorKey,
       isLoading,
+      isVariableUncovered,
       loadStartTime,
-      paneWidth,
+      oAuth2Token,
       paneHeight,
+      paneWidth,
+      requestMetas,
+      requestVersions,
+      responseDownloadPath,
       responseFilter,
       responseFilterHistory,
       responsePreviewMode,
-      oAuth2Token,
       settings,
       sidebarChildren,
-      sidebarFilter,
       sidebarHidden,
       sidebarWidth,
+      syncItems,
+      unseenWorkspaces,
+      vcs,
       workspaceChildren,
       workspaces,
-      unseenWorkspaces,
-      isVariableUncovered
     } = this.props;
 
     const realSidebarWidth = sidebarHidden ? 0 : sidebarWidth;
@@ -436,15 +573,18 @@ class Wrapper extends React.PureComponent<Props, State> {
             isVariableUncovered={isVariableUncovered}
           />
 
-          <CookiesModal
-            handleShowModifyCookieModal={this._handleShowModifyCookieModal}
-            handleRender={handleRender}
-            nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
-            ref={registerModal}
-            workspace={activeWorkspace}
-            cookieJar={activeCookieJar}
-            isVariableUncovered={isVariableUncovered}
-          />
+          {/* TODO: Figure out why cookieJar is sometimes null */}
+          {activeCookieJar ? (
+            <CookiesModal
+              handleShowModifyCookieModal={Wrapper._handleShowModifyCookieModal}
+              handleRender={handleRender}
+              nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
+              ref={registerModal}
+              workspace={activeWorkspace}
+              cookieJar={activeCookieJar}
+              isVariableUncovered={isVariableUncovered}
+            />
+          ) : null}
 
           <CookieModifyModal
             handleRender={handleRender}
@@ -479,6 +619,7 @@ class Wrapper extends React.PureComponent<Props, State> {
             nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
             handleRemoveWorkspace={this._handleRemoveActiveWorkspace}
             handleDuplicateWorkspace={handleDuplicateWorkspace}
+            handleClearAllResponses={this._handleActiveWorkspaceClearAllResponses}
             isVariableUncovered={isVariableUncovered}
           />
 
@@ -494,7 +635,7 @@ class Wrapper extends React.PureComponent<Props, State> {
 
           <SettingsModal
             ref={registerModal}
-            handleExportWorkspaceToFile={this._handleExportWorkspaceToFile}
+            handleShowExportRequestsModal={handleShowExportRequestsModal}
             handleExportAllToFile={handleExportFile}
             handleImportFile={this._handleImportFile}
             handleImportUri={this._handleImportUri}
@@ -506,11 +647,12 @@ class Wrapper extends React.PureComponent<Props, State> {
 
           <RequestSwitcherModal
             ref={registerModal}
+            workspace={activeWorkspace}
             workspaces={workspaces}
             workspaceChildren={workspaceChildren}
-            workspaceId={activeWorkspace._id}
-            activeRequestParentId={activeRequest ? activeRequest.parentId : activeWorkspace._id}
+            activeRequest={activeRequest}
             activateRequest={handleActivateRequest}
+            requestMetas={requestMetas}
             handleSetActiveWorkspace={handleSetActiveWorkspace}
           />
 
@@ -529,6 +671,31 @@ class Wrapper extends React.PureComponent<Props, State> {
 
           <SetupSyncModal ref={registerModal} workspace={activeWorkspace} />
 
+          {vcs && (
+            <React.Fragment>
+              <SyncStagingModal
+                ref={registerModal}
+                workspace={activeWorkspace}
+                vcs={vcs}
+                syncItems={syncItems}
+              />
+              <SyncMergeModal
+                ref={registerModal}
+                workspace={activeWorkspace}
+                syncItems={syncItems}
+                vcs={vcs}
+              />
+              <SyncBranchesModal
+                ref={registerModal}
+                workspace={activeWorkspace}
+                vcs={vcs}
+                syncItems={syncItems}
+              />
+              <SyncHistoryModal ref={registerModal} workspace={activeWorkspace} vcs={vcs} />
+              <SyncShareModal ref={registerModal} workspace={activeWorkspace} vcs={vcs} />
+            </React.Fragment>
+          )}
+
           <WorkspaceEnvironmentsEditModal
             ref={registerModal}
             onChange={models.workspace.update}
@@ -542,13 +709,20 @@ class Wrapper extends React.PureComponent<Props, State> {
             nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
             isVariableUncovered={isVariableUncovered}
           />
+
+          <AddKeyCombinationModal ref={registerModal} />
+          <ExportRequestsModal
+            ref={registerModal}
+            childObjects={sidebarChildren.all}
+            handleExportRequestsToFile={handleExportRequestsToFile}
+          />
         </ErrorBoundary>
       </div>,
       <div
         key="wrapper"
         id="wrapper"
         className={classnames('wrapper', {
-          'wrapper--vertical': settings.forceVerticalLayout
+          'wrapper--vertical': settings.forceVerticalLayout,
         })}
         style={{
           gridTemplateColumns: columns,
@@ -577,41 +751,28 @@ class Wrapper extends React.PureComponent<Props, State> {
             activeEnvironment.color &&
             settings.environmentHighlightColorStyle === 'window-right'
               ? '5px solid ' + activeEnvironment.color
-              : null
+              : null,
         }}>
         <ErrorBoundary showAlert>
           <Sidebar
             ref={handleSetSidebarRef}
-            showEnvironmentsModal={this._handleShowEnvironmentsModal}
-            showCookiesModal={this._handleShowCookiesModal}
-            handleActivateRequest={handleActivateRequest}
-            handleChangeFilter={handleSetSidebarFilter}
-            handleImportFile={this._handleImportFile}
-            handleExportFile={handleExportFile}
-            handleSetActiveWorkspace={handleSetActiveWorkspace}
-            handleDuplicateRequest={handleDuplicateRequest}
-            handleGenerateCode={handleGenerateCode}
-            handleCopyAsCurl={handleCopyAsCurl}
-            handleDuplicateRequestGroup={handleDuplicateRequestGroup}
-            handleMoveRequestGroup={handleMoveRequestGroup}
-            handleSetActiveEnvironment={handleSetActiveEnvironment}
-            moveDoc={handleMoveDoc}
-            handleSetRequestGroupCollapsed={handleSetRequestGroupCollapsed}
-            activeRequest={activeRequest}
             activeEnvironment={activeEnvironment}
-            handleCreateRequest={handleCreateRequest}
-            handleCreateRequestGroup={handleCreateRequestGroup}
-            filter={sidebarFilter || ''}
-            hidden={sidebarHidden || false}
-            workspace={activeWorkspace}
-            unseenWorkspaces={unseenWorkspaces}
-            childObjects={sidebarChildren}
-            width={sidebarWidth}
-            isLoading={isLoading}
-            workspaces={workspaces}
-            environments={environments}
+            enableSyncBeta={settings.enableSyncBeta}
             environmentHighlightColorStyle={settings.environmentHighlightColorStyle}
-          />
+            handleSetActiveEnvironment={handleSetActiveEnvironment}
+            handleSetActiveWorkspace={handleSetActiveWorkspace}
+            hidden={sidebarHidden || false}
+            hotKeyRegistry={settings.hotKeyRegistry}
+            isLoading={isLoading}
+            showEnvironmentsModal={this._handleShowEnvironmentsModal}
+            syncItems={syncItems}
+            unseenWorkspaces={unseenWorkspaces}
+            vcs={vcs}
+            width={sidebarWidth}
+            workspace={activeWorkspace}
+            workspaces={workspaces}>
+            {this.renderSidebarBody()}
+          </Sidebar>
         </ErrorBoundary>
 
         <div className="drag drag--sidebar">
@@ -624,6 +785,7 @@ class Wrapper extends React.PureComponent<Props, State> {
             handleImportFile={this._handleImportFile}
             request={activeRequest}
             workspace={activeWorkspace}
+            downloadPath={responseDownloadPath}
             settings={settings}
             environmentId={activeEnvironment ? activeEnvironment._id : ''}
             oAuth2Token={oAuth2Token}
@@ -633,13 +795,14 @@ class Wrapper extends React.PureComponent<Props, State> {
             handleImport={this._handleImport}
             handleRender={handleRender}
             handleGetRenderContext={handleGetRenderContext}
-            updateRequestBody={this._handleUpdateRequestBody}
+            handleUpdateDownloadPath={handleUpdateDownloadPath}
+            updateRequestBody={Wrapper._handleUpdateRequestBody}
             forceUpdateRequestHeaders={this._handleForceUpdateRequestHeaders}
-            updateRequestUrl={this._handleUpdateRequestUrl}
-            updateRequestMethod={this._handleUpdateRequestMethod}
-            updateRequestParameters={this._handleUpdateRequestParameters}
-            updateRequestAuthentication={this._handleUpdateRequestAuthentication}
-            updateRequestHeaders={this._handleUpdateRequestHeaders}
+            updateRequestUrl={Wrapper._handleUpdateRequestUrl}
+            updateRequestMethod={Wrapper._handleUpdateRequestMethod}
+            updateRequestParameters={Wrapper._handleUpdateRequestParameters}
+            updateRequestAuthentication={Wrapper._handleUpdateRequestAuthentication}
+            updateRequestHeaders={Wrapper._handleUpdateRequestHeaders}
             updateRequestMimeType={handleUpdateRequestMimeType}
             updateSettingsShowPasswords={this._handleUpdateSettingsShowPasswords}
             updateSettingsUseBulkHeaderEditor={this._handleUpdateSettingsUseBulkHeaderEditor}
@@ -648,6 +811,7 @@ class Wrapper extends React.PureComponent<Props, State> {
             handleSendAndDownload={this._handleSendAndDownloadRequestWithActiveEnvironment}
             nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
             isVariableUncovered={isVariableUncovered}
+            headerEditorKey={headerEditorKey}
           />
         </ErrorBoundary>
 
@@ -669,12 +833,14 @@ class Wrapper extends React.PureComponent<Props, State> {
           <ResponsePane
             ref={handleSetResponsePaneRef}
             request={activeRequest}
+            requestVersions={requestVersions}
             responses={activeRequestResponses}
             response={activeResponse}
             editorFontSize={settings.editorFontSize}
             editorIndentSize={settings.editorIndentSize}
             editorKeyMap={settings.editorKeyMap}
             editorLineWrapping={settings.editorLineWrapping}
+            hotKeyRegistry={settings.hotKeyRegistry}
             previewMode={responsePreviewMode}
             filter={responseFilter}
             filterHistory={responseFilterHistory}
@@ -688,7 +854,7 @@ class Wrapper extends React.PureComponent<Props, State> {
             handleSetFilter={this._handleSetResponseFilter}
           />
         </ErrorBoundary>
-      </div>
+      </div>,
     ];
   }
 }

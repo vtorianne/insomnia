@@ -28,7 +28,7 @@ class OneLineEditor extends PureComponent {
     }
 
     this.state = {
-      mode
+      mode,
     };
   }
 
@@ -302,7 +302,7 @@ class OneLineEditor extends PureComponent {
       getAutocompleteConstants,
       isVariableUncovered,
       mode: syntaxMode,
-      type: originalType
+      type: originalType,
     } = this.props;
 
     const { mode } = this.state;
@@ -313,67 +313,34 @@ class OneLineEditor extends PureComponent {
     if (showEditor) {
       return (
         <React.Fragment>
-          {isVariableUncovered && (
-            <CodeEditor
-              ref={this._setEditorRef}
-              defaultTabBehavior
-              hideLineNumbers
-              hideScrollbars
-              noMatchBrackets
-              noStyleActiveLine
-              noLint
-              singleLine
-              tabIndex={0}
-              id={id}
-              type={type}
-              mode={syntaxMode}
-              placeholder={placeholder}
-              onPaste={onPaste}
-              onBlur={this._handleEditorBlur}
-              onKeyDown={this._handleKeyDown}
-              onFocus={this._handleEditorFocus}
-              onMouseLeave={this._handleEditorMouseLeave}
-              onChange={onChange}
-              render={render}
-              getRenderContext={getRenderContext}
-              nunjucksPowerUserMode={nunjucksPowerUserMode}
-              getAutocompleteConstants={getAutocompleteConstants}
-              className={classnames('editor--single-line', className)}
-              defaultValue={defaultValue}
-              isVariableUncovered={isVariableUncovered}
-            />
-          )}
-
-          {!isVariableUncovered && (
-            <CodeEditor
-              ref={this._setEditorRef}
-              defaultTabBehavior
-              hideLineNumbers
-              hideScrollbars
-              noMatchBrackets
-              noStyleActiveLine
-              noLint
-              singleLine
-              tabIndex={0}
-              id={id}
-              type={type}
-              mode={syntaxMode}
-              placeholder={placeholder}
-              onPaste={onPaste}
-              onBlur={this._handleEditorBlur}
-              onKeyDown={this._handleKeyDown}
-              onFocus={this._handleEditorFocus}
-              onMouseLeave={this._handleEditorMouseLeave}
-              onChange={onChange}
-              render={render}
-              getRenderContext={getRenderContext}
-              nunjucksPowerUserMode={nunjucksPowerUserMode}
-              getAutocompleteConstants={getAutocompleteConstants}
-              className={classnames('editor--single-line', className)}
-              defaultValue={defaultValue}
-              isVariableUncovered={isVariableUncovered}
-            />
-          )}
+          <CodeEditor
+            ref={this._setEditorRef}
+            defaultTabBehavior
+            hideLineNumbers
+            hideScrollbars
+            noMatchBrackets
+            noStyleActiveLine
+            noLint
+            singleLine
+            tabIndex={0}
+            id={id}
+            type={type}
+            mode={syntaxMode}
+            placeholder={placeholder}
+            onPaste={onPaste}
+            onBlur={this._handleEditorBlur}
+            onKeyDown={this._handleKeyDown}
+            onFocus={this._handleEditorFocus}
+            onMouseLeave={this._handleEditorMouseLeave}
+            onChange={onChange}
+            render={render}
+            getRenderContext={getRenderContext}
+            nunjucksPowerUserMode={nunjucksPowerUserMode}
+            getAutocompleteConstants={getAutocompleteConstants}
+            className={classnames('editor--single-line', className)}
+            defaultValue={defaultValue}
+            isVariableUncovered={isVariableUncovered}
+          />
         </React.Fragment>
       );
     } else {
@@ -385,7 +352,7 @@ class OneLineEditor extends PureComponent {
           className={className}
           style={{
             // background: 'rgba(255, 0, 0, 0.05)', // For debugging
-            width: '100%'
+            width: '100%',
           }}
           placeholder={placeholder}
           defaultValue={defaultValue}
@@ -423,7 +390,7 @@ OneLineEditor.propTypes = {
   className: PropTypes.string,
   forceEditor: PropTypes.bool,
   forceInput: PropTypes.bool,
-  isVariableUncovered: PropTypes.bool
+  isVariableUncovered: PropTypes.bool,
 };
 
 export default OneLineEditor;

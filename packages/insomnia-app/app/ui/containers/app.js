@@ -4,7 +4,7 @@ import autobind from 'autobind-decorator';
 import fs from 'fs';
 import { clipboard, ipcRenderer, remote } from 'electron';
 import { parse as urlParse } from 'url';
-import HTTPSnippet from 'insomnia-httpsnippet';
+import HTTPSnippet from 'httpsnippet';
 import ReactDOM from 'react-dom';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
@@ -25,7 +25,7 @@ import {
   MIN_PANE_HEIGHT,
   MIN_PANE_WIDTH,
   MIN_SIDEBAR_REMS,
-  PREVIEW_MODE_SOURCE
+  PREVIEW_MODE_SOURCE,
 } from '../../common/constants';
 import * as globalActions from '../redux/modules/global';
 import * as db from '../../common/database';
@@ -42,8 +42,9 @@ import {
   selectActiveWorkspaceMeta,
   selectEntitiesLists,
   selectSidebarChildren,
+  selectSyncItems,
   selectUnseenWorkspaces,
-  selectWorkspaceRequestsAndRequestGroups
+  selectWorkspaceRequestsAndRequestGroups,
 } from '../redux/selectors';
 import RequestCreateModal from '../components/modals/request-create-modal';
 import GenerateCodeModal from '../components/modals/generate-code-modal';
@@ -51,14 +52,15 @@ import WorkspaceSettingsModal from '../components/modals/workspace-settings-moda
 import RequestSettingsModal from '../components/modals/request-settings-modal';
 import RequestRenderErrorModal from '../components/modals/request-render-error-modal';
 import * as network from '../../network/network';
-import { debounce, getContentDispositionHeader } from '../../common/misc';
+import { debounce, getContentDispositionHeader, getDataDirectory } from '../../common/misc';
 import * as mime from 'mime-types';
 import * as path from 'path';
 import * as render from '../../common/render';
 import { getKeys } from '../../templating/utils';
 import { showAlert, showModal, showPrompt } from '../components/modals/index';
 import { exportHarRequest } from '../../common/har';
-import * as hotkeys from '../../common/hotkeys';
+import { hotKeyRefs } from '../../common/hotkeys';
+import { executeHotKey } from '../../common/hotkeys-listener';
 import KeydownBinder from '../components/keydown-binder';
 import ErrorBoundary from '../components/error-boundary';
 import * as plugins from '../../plugins';
@@ -67,6 +69,10 @@ import AskModal from '../components/modals/ask-modal';
 import { updateMimeType } from '../../models/request';
 import MoveRequestGroupModal from '../components/modals/move-request-group-modal';
 import * as themes from '../../plugins/misc';
+import ExportRequestsModal from '../components/modals/export-requests-modal';
+import FileSystemDriver from '../../sync/store/drivers/file-system-driver';
+import VCS from '../../sync/vcs';
+import SyncMergeModal from '../components/modals/sync-merge-modal';
 
 @autobind
 class App extends PureComponent {
@@ -81,7 +87,10 @@ class App extends PureComponent {
       sidebarWidth: props.sidebarWidth || DEFAULT_SIDEBAR_WIDTH,
       paneWidth: props.paneWidth || DEFAULT_PANE_WIDTH,
       paneHeight: props.paneHeight || DEFAULT_PANE_HEIGHT,
-      isVariableUncovered: props.isVariableUncovered || false
+      isVariableUncovered: props.isVariableUncovered || false,
+      vcs: null,
+      forceRefreshCounter: 0,
+      forceRefreshHeaderCounter: 0,
     };
 
     this._isMigratingChildren = false;
@@ -91,7 +100,7 @@ class App extends PureComponent {
     this._savePaneWidth = debounce(paneWidth => this._updateActiveWorkspaceMeta({ paneWidth }));
     this._savePaneHeight = debounce(paneHeight => this._updateActiveWorkspaceMeta({ paneHeight }));
     this._saveSidebarWidth = debounce(sidebarWidth =>
-      this._updateActiveWorkspaceMeta({ sidebarWidth })
+      this._updateActiveWorkspaceMeta({ sidebarWidth }),
     );
 
     this._globalKeyMap = null;
@@ -100,54 +109,90 @@ class App extends PureComponent {
   _setGlobalKeyMap() {
     this._globalKeyMap = [
       [
-        hotkeys.SHOW_WORKSPACE_SETTINGS,
+        hotKeyRefs.PREFERENCES_SHOW_GENERAL,
+        () => {
+          showModal(SettingsModal);
+        },
+      ],
+      [
+        hotKeyRefs.PREFERENCES_SHOW_KEYBOARD_SHORTCUTS,
+        () => {
+          showModal(SettingsModal, TAB_INDEX_SHORTCUTS);
+        },
+      ],
+      [
+        hotKeyRefs.SHOW_RECENT_REQUESTS,
+        () => {
+          showModal(RequestSwitcherModal, {
+            disableInput: true,
+            maxRequests: 10,
+            maxWorkspaces: 0,
+            selectOnKeyup: true,
+            title: 'Recent Requests',
+            hideNeverActiveRequests: true,
+
+            // Add an open delay so the dialog won't show for quick presses
+            openDelay: 150,
+          });
+        },
+      ],
+      [
+        hotKeyRefs.WORKSPACE_SHOW_SETTINGS,
         () => {
           const { activeWorkspace } = this.props;
           showModal(WorkspaceSettingsModal, activeWorkspace);
-        }
+        },
       ],
       [
-        hotkeys.SHOW_REQUEST_SETTINGS,
+        hotKeyRefs.REQUEST_SHOW_SETTINGS,
         () => {
           if (this.props.activeRequest) {
             showModal(RequestSettingsModal, {
-              request: this.props.activeRequest
+              request: this.props.activeRequest,
             });
           }
-        }
+        },
       ],
       [
-        hotkeys.SHOW_QUICK_SWITCHER,
+        hotKeyRefs.REQUEST_QUICK_SWITCH,
         () => {
           showModal(RequestSwitcherModal);
-        }
+        },
       ],
-      [hotkeys.SEND_REQUEST, this._handleSendShortcut],
-      [hotkeys.SEND_REQUEST_F5, this._handleSendShortcut],
+      [hotKeyRefs.REQUEST_SEND, this._handleSendShortcut],
       [
-        hotkeys.SHOW_ENVIRONMENTS,
+        hotKeyRefs.ENVIRONMENT_SHOW_EDITOR,
         () => {
           const { activeWorkspace } = this.props;
           showModal(WorkspaceEnvironmentsEditModal, activeWorkspace);
-        }
+        },
       ],
       [
-        hotkeys.SHOW_COOKIES,
+        hotKeyRefs.SHOW_COOKIES_EDITOR,
         () => {
           const { activeWorkspace } = this.props;
           showModal(CookiesModal, activeWorkspace);
-        }
+        },
       ],
       [
-        hotkeys.CREATE_REQUEST,
+        hotKeyRefs.REQUEST_QUICK_CREATE,
+        async () => {
+          const { activeRequest, activeWorkspace } = this.props;
+          const parentId = activeRequest ? activeRequest.parentId : activeWorkspace._id;
+          const request = await models.request.create({ parentId, name: 'New Request' });
+          await this._handleSetActiveRequest(request._id);
+        },
+      ],
+      [
+        hotKeyRefs.REQUEST_SHOW_CREATE,
         () => {
           const { activeRequest, activeWorkspace } = this.props;
           const parentId = activeRequest ? activeRequest.parentId : activeWorkspace._id;
           this._requestCreate(parentId);
-        }
+        },
       ],
       [
-        hotkeys.DELETE_REQUEST,
+        hotKeyRefs.REQUEST_SHOW_DELETE,
         () => {
           const { activeRequest } = this.props;
 
@@ -163,36 +208,51 @@ class App extends PureComponent {
                 return;
               }
               models.request.remove(activeRequest);
-            }
+            },
           });
-        }
+        },
       ],
       [
-        hotkeys.CREATE_FOLDER,
+        hotKeyRefs.REQUEST_SHOW_CREATE_FOLDER,
         () => {
           const { activeRequest, activeWorkspace } = this.props;
           const parentId = activeRequest ? activeRequest.parentId : activeWorkspace._id;
           this._requestGroupCreate(parentId);
-        }
+        },
       ],
       [
-        hotkeys.GENERATE_CODE,
+        hotKeyRefs.REQUEST_SHOW_GENERATE_CODE_EDITOR,
         async () => {
           showModal(GenerateCodeModal, this.props.activeRequest);
-        }
+        },
       ],
       [
-        hotkeys.DUPLICATE_REQUEST,
+        hotKeyRefs.REQUEST_SHOW_DUPLICATE,
         async () => {
           await this._requestDuplicate(this.props.activeRequest);
-        }
+        },
       ],
       [
-        hotkeys.UNCOVER_VARIABLES,
+        hotKeyRefs.REQUEST_TOGGLE_PIN,
+        async () => {
+          if (!this.props.activeRequest) {
+            return;
+          }
+
+          const metas = Object.values(this.props.entities.requestMetas).find(
+            m => m.parentId === this.props.activeRequest._id,
+          );
+
+          await this._handleSetRequestPinned(this.props.activeRequest, !(metas && metas.pinned));
+        },
+      ],
+      [hotKeyRefs.PLUGIN_RELOAD, this._handleReloadPlugins],
+      [
+        hotKeyRefs.ENVIRONMENT_UNCOVER_VARIABLES,
         async () => {
           await this._updateIsVariableUncovered();
-        }
-      ]
+        },
+      ],
     ];
   }
 
@@ -200,7 +260,7 @@ class App extends PureComponent {
     const { activeRequest, activeEnvironment } = this.props;
     await this._handleSendRequestWithEnvironment(
       activeRequest ? activeRequest._id : 'n/a',
-      activeEnvironment ? activeEnvironment._id : 'n/a'
+      activeEnvironment ? activeEnvironment._id : 'n/a',
     );
   }
 
@@ -226,13 +286,13 @@ class App extends PureComponent {
       onComplete: async name => {
         const requestGroup = await models.requestGroup.create({
           parentId,
-          name
+          name,
         });
         await models.requestGroupMeta.create({
           parentId: requestGroup._id,
-          collapsed: false
+          collapsed: false,
         });
-      }
+      },
     });
   }
 
@@ -241,15 +301,15 @@ class App extends PureComponent {
       parentId,
       onComplete: request => {
         this._handleSetActiveRequest(request._id);
-      }
+      },
     });
   }
 
-  async _requestGroupDuplicate(requestGroup) {
+  static async _requestGroupDuplicate(requestGroup) {
     models.requestGroup.duplicate(requestGroup);
   }
 
-  async _requestGroupMove(requestGroup) {
+  static async _requestGroupMove(requestGroup) {
     showModal(MoveRequestGroupModal, { requestGroup });
   }
 
@@ -273,7 +333,7 @@ class App extends PureComponent {
         const newWorkspace = await db.duplicate(workspace, { name });
         await this.props.handleSetActiveWorkspace(newWorkspace._id);
         callback();
-      }
+      },
     });
   }
 
@@ -284,7 +344,7 @@ class App extends PureComponent {
     const ancestors = await db.withAncestors(activeRequest || activeWorkspace, [
       models.request.type,
       models.requestGroup.type,
-      models.workspace.type
+      models.workspace.type,
     ]);
 
     return render.getRenderContext(activeRequest, environmentId, ancestors);
@@ -306,10 +366,8 @@ class App extends PureComponent {
    */
   async _handleRenderText(text, contextCacheKey = null) {
     if (!contextCacheKey || !this._getRenderContextPromiseCache[contextCacheKey]) {
-      const context = this._fetchRenderContext();
-
       // NOTE: We're caching promises here to avoid race conditions
-      this._getRenderContextPromiseCache[contextCacheKey] = context;
+      this._getRenderContextPromiseCache[contextCacheKey] = this._fetchRenderContext();
     }
 
     // Set timeout to delete the key eventually
@@ -320,10 +378,10 @@ class App extends PureComponent {
   }
 
   _handleGenerateCodeForActiveRequest() {
-    this._handleGenerateCode(this.props.activeRequest);
+    App._handleGenerateCode(this.props.activeRequest);
   }
 
-  _handleGenerateCode(request) {
+  static _handleGenerateCode(request) {
     showModal(GenerateCodeModal, request);
   }
 
@@ -336,7 +394,7 @@ class App extends PureComponent {
     clipboard.writeText(cmd);
   }
 
-  async _updateRequestGroupMetaByParentId(requestGroupId, patch) {
+  static async _updateRequestGroupMetaByParentId(requestGroupId, patch) {
     const requestGroupMeta = await models.requestGroupMeta.getByParentId(requestGroupId);
     if (requestGroupMeta) {
       await models.requestGroupMeta.update(requestGroupMeta, patch);
@@ -357,7 +415,7 @@ class App extends PureComponent {
     }
   }
 
-  async _updateRequestMetaByParentId(requestId, patch) {
+  static async _updateRequestMetaByParentId(requestId, patch) {
     const requestMeta = await models.requestMeta.getByParentId(requestId);
     if (requestMeta) {
       return models.requestMeta.update(requestMeta, patch);
@@ -367,7 +425,7 @@ class App extends PureComponent {
     }
   }
 
-  _updateIsVariableUncovered(paneWidth) {
+  _updateIsVariableUncovered() {
     this.setState({ isVariableUncovered: !this.state.isVariableUncovered });
   }
 
@@ -383,15 +441,14 @@ class App extends PureComponent {
 
   async _handleSetActiveRequest(activeRequestId) {
     await this._updateActiveWorkspaceMeta({ activeRequestId });
+    await App._updateRequestMetaByParentId(activeRequestId, { lastActive: Date.now() });
   }
 
   async _handleSetActiveEnvironment(activeEnvironmentId) {
     await this._updateActiveWorkspaceMeta({ activeEnvironmentId });
 
     // Give it time to update and re-render
-    setTimeout(() => {
-      this._wrapper._forceRequestPaneRefresh();
-    }, 100);
+    setTimeout(() => this._wrapper._forceRequestPaneRefresh(), 300);
   }
 
   _handleSetSidebarWidth(sidebarWidth) {
@@ -408,15 +465,23 @@ class App extends PureComponent {
   }
 
   _handleSetRequestGroupCollapsed(requestGroupId, collapsed) {
-    this._updateRequestGroupMetaByParentId(requestGroupId, { collapsed });
+    App._updateRequestGroupMetaByParentId(requestGroupId, { collapsed });
+  }
+
+  async _handleSetRequestPinned(request, pinned) {
+    App._updateRequestMetaByParentId(request._id, { pinned });
   }
 
   _handleSetResponsePreviewMode(requestId, previewMode) {
-    this._updateRequestMetaByParentId(requestId, { previewMode });
+    App._updateRequestMetaByParentId(requestId, { previewMode });
+  }
+
+  _handleUpdateDownloadPath(requestId, downloadPath) {
+    App._updateRequestMetaByParentId(requestId, { downloadPath });
   }
 
   async _handleSetResponseFilter(requestId, responseFilter) {
-    await this._updateRequestMetaByParentId(requestId, { responseFilter });
+    await App._updateRequestMetaByParentId(requestId, { responseFilter });
 
     clearTimeout(this._responseFilterHistorySaveTimeout);
     this._responseFilterHistorySaveTimeout = setTimeout(async () => {
@@ -434,8 +499,8 @@ class App extends PureComponent {
       }
 
       responseFilterHistory.unshift(responseFilter);
-      await this._updateRequestMetaByParentId(requestId, {
-        responseFilterHistory
+      await App._updateRequestMetaByParentId(requestId, {
+        responseFilterHistory,
       });
     }, 2000);
   }
@@ -447,7 +512,7 @@ class App extends PureComponent {
     }
 
     const requestMeta = await models.requestMeta.getOrCreateByParentId(
-      this.props.activeRequest._id
+      this.props.activeRequest._id,
     );
     const savedBody = requestMeta.savedRequestBody;
 
@@ -457,14 +522,16 @@ class App extends PureComponent {
         : {}; // Clear saved value in requestMeta
 
     await models.requestMeta.update(requestMeta, {
-      savedRequestBody: saveValue
+      savedRequestBody: saveValue,
     });
 
     const newRequest = await updateMimeType(this.props.activeRequest, mimeType, false, savedBody);
 
     // Force it to update, because other editor components (header editor)
     // needs to change. Need to wait a delay so the next render can finish
-    setTimeout(this._wrapper._forceRequestPaneRefresh, 300);
+    setTimeout(() => {
+      this.setState({ forceRefreshHeaderCounter: this.state.forceRefreshHeaderCounter + 1 });
+    }, 500);
 
     return newRequest;
   }
@@ -474,7 +541,7 @@ class App extends PureComponent {
       const options = {
         title: 'Select Download Location',
         buttonLabel: 'Send and Save',
-        defaultPath: window.localStorage.getItem('insomnia.sendAndDownloadLocation')
+        defaultPath: window.localStorage.getItem('insomnia.sendAndDownloadLocation'),
       };
 
       remote.dialog.showSaveDialog(options, filename => {
@@ -485,6 +552,8 @@ class App extends PureComponent {
   }
 
   async _handleSendAndDownloadRequestWithEnvironment(requestId, environmentId, dir) {
+    const { settings, handleStartLoading, handleStopLoading } = this.props;
+
     const request = await models.request.getById(requestId);
     if (!request) {
       return;
@@ -498,7 +567,7 @@ class App extends PureComponent {
     }
 
     // Start loading
-    this.props.handleStartLoading(requestId);
+    handleStartLoading(requestId);
 
     try {
       const responsePatch = await network.send(requestId, environmentId);
@@ -506,11 +575,11 @@ class App extends PureComponent {
       const header = getContentDispositionHeader(headers);
       const nameFromHeader = header ? header.value : null;
 
-      if (!responsePatch.bodyPath) {
-        return;
-      }
-
-      if (responsePatch.statusCode >= 200 && responsePatch.statusCode < 300) {
+      if (
+        responsePatch.bodyPath &&
+        responsePatch.statusCode >= 200 &&
+        responsePatch.statusCode < 300
+      ) {
         const extension = mime.extension(responsePatch.contentType) || 'unknown';
         const name =
           nameFromHeader || `${request.name.replace(/\s/g, '-').toLowerCase()}.${extension}`;
@@ -533,13 +602,16 @@ class App extends PureComponent {
 
         readStream.on('end', async () => {
           responsePatch.error = `Saved to ${filename}`;
-          await models.response.create(responsePatch);
+          await models.response.create(responsePatch, settings.maxHistoryResponses);
         });
 
         readStream.on('error', async err => {
           console.warn('Failed to download request after sending', responsePatch.bodyPath, err);
-          await models.response.create(responsePatch);
+          await models.response.create(responsePatch, settings.maxHistoryResponses);
         });
+      } else {
+        // Save the bad responses so failures are shown still
+        await models.response.create(responsePatch, settings.maxHistoryResponses);
       }
     } catch (err) {
       showAlert({
@@ -551,20 +623,21 @@ class App extends PureComponent {
               <pre>{err.message}</pre>
             </code>
           </div>
-        )
+        ),
       });
     }
 
     // Unset active response because we just made a new one
-    await this._updateRequestMetaByParentId(requestId, {
-      activeResponseId: null
+    await App._updateRequestMetaByParentId(requestId, {
+      activeResponseId: null,
     });
 
     // Stop loading
-    this.props.handleStopLoading(requestId);
+    handleStopLoading(requestId);
   }
 
   async _handleSendRequestWithEnvironment(requestId, environmentId) {
+    const { handleStartLoading, handleStopLoading, settings } = this.props;
     const request = await models.request.getById(requestId);
     if (!request) {
       return;
@@ -577,11 +650,11 @@ class App extends PureComponent {
       this._sendRequestTrackingKey = key;
     }
 
-    this.props.handleStartLoading(requestId);
+    handleStartLoading(requestId);
 
     try {
       const responsePatch = await network.send(requestId, environmentId);
-      await models.response.create(responsePatch);
+      await models.response.create(responsePatch, settings.maxHistoryResponses);
     } catch (err) {
       if (err.type === 'render') {
         showModal(RequestRenderErrorModal, { request, error: err });
@@ -595,23 +668,23 @@ class App extends PureComponent {
                 <pre>{err.message}</pre>
               </code>
             </div>
-          )
+          ),
         });
       }
     }
 
     // Unset active response because we just made a new one
-    await this._updateRequestMetaByParentId(requestId, {
-      activeResponseId: null
+    await App._updateRequestMetaByParentId(requestId, {
+      activeResponseId: null,
     });
 
     // Stop loading
-    this.props.handleStopLoading(requestId);
+    handleStopLoading(requestId);
   }
 
   async _handleSetActiveResponse(requestId, activeResponse = null) {
     const activeResponseId = activeResponse ? activeResponse._id : null;
-    await this._updateRequestMetaByParentId(requestId, { activeResponseId });
+    await App._updateRequestMetaByParentId(requestId, { activeResponseId });
 
     let response;
     if (activeResponseId) {
@@ -707,8 +780,9 @@ class App extends PureComponent {
         this.setState({ showDragOverlay: true });
       }
 
-      const currentPixelWidth = ReactDOM.findDOMNode(this._sidebar).offsetWidth;
-      const ratio = e.clientX / currentPixelWidth;
+      const sidebar = ReactDOM.findDOMNode(this._sidebar);
+      const currentPixelWidth = sidebar.offsetWidth;
+      const ratio = (e.clientX - sidebar.offsetLeft) / currentPixelWidth;
       const width = this.state.sidebarWidth * ratio;
 
       let sidebarWidth = Math.min(width, MAX_SIDEBAR_REMS);
@@ -737,7 +811,7 @@ class App extends PureComponent {
 
   _handleKeyDown(e) {
     for (const [definition, callback] of this._globalKeyMap) {
-      hotkeys.executeHotKey(e, definition, callback);
+      executeHotKey(e, definition, callback);
     }
   }
 
@@ -755,8 +829,20 @@ class App extends PureComponent {
     await this._handleSetSidebarHidden(sidebarHidden);
   }
 
+  _handleShowExportRequestsModal() {
+    showModal(ExportRequestsModal);
+  }
+
   _setWrapperRef(n) {
     this._wrapper = n;
+  }
+
+  async _handleReloadPlugins() {
+    const { settings } = this.props;
+    await plugins.getPlugins(true);
+    templating.reload();
+    themes.setTheme(settings.theme);
+    console.log('[plugins] reloaded');
   }
 
   /**
@@ -779,8 +865,38 @@ class App extends PureComponent {
     document.title = title;
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps) {
     this._updateDocumentTitle();
+
+    // Force app refresh if login state changes
+    if (prevProps.isLoggedIn !== this.props.isLoggedIn) {
+      this.setState(state => ({
+        forceRefreshCounter: state.forceRefreshCounter + 1,
+      }));
+    }
+  }
+
+  async _updateVCS(activeWorkspace) {
+    // Get the vcs and set it to null in the state while we update it
+    let vcs = this.state.vcs;
+    this.setState({ vcs: null });
+
+    if (!vcs) {
+      const directory = path.join(getDataDirectory(), 'version-control');
+      const driver = new FileSystemDriver({ directory });
+      vcs = new VCS(driver, async conflicts => {
+        return new Promise(resolve => {
+          showModal(SyncMergeModal, {
+            conflicts,
+            handleDone: conflicts => resolve(conflicts),
+          });
+        });
+      });
+    }
+
+    await vcs.switchProject(activeWorkspace._id);
+
+    this.setState({ vcs });
   }
 
   async componentDidMount() {
@@ -792,22 +908,17 @@ class App extends PureComponent {
     // Update title
     this._updateDocumentTitle();
 
+    // Update VCS
+    await this._updateVCS(this.props.activeWorkspace);
+
     db.onChange(async changes => {
       let needsRefresh = false;
 
       for (const change of changes) {
-        const [
-          _, // eslint-disable-line no-unused-vars
-          doc,
-          fromSync
-        ] = change;
+        const [type, doc, fromSync] = change;
 
+        const { vcs } = this.state;
         const { activeRequest } = this.props;
-
-        // No active request, so we don't need to force refresh anything
-        if (!activeRequest) {
-          return;
-        }
 
         // Force refresh if environment changes
         // TODO: Only do this for environments in this workspace (not easy because they're nested)
@@ -817,14 +928,19 @@ class App extends PureComponent {
         }
 
         // Force refresh if sync changes the active request
-        if (fromSync && doc._id === activeRequest._id) {
+        if (fromSync && activeRequest && doc._id === activeRequest._id) {
           needsRefresh = true;
           console.log('[App] Forcing update from request change', change);
+        }
+
+        // Delete VCS project if workspace deleted
+        if (vcs && doc.type === models.workspace.type && type === db.CHANGE_REMOVE) {
+          await vcs.removeProjectsForRoot(doc._id);
         }
       }
 
       if (needsRefresh) {
-        this._wrapper._forceRequestPaneRefresh();
+        setTimeout(() => this._wrapper._forceRequestPaneRefresh(), 300);
       }
     });
 
@@ -832,13 +948,7 @@ class App extends PureComponent {
       showModal(SettingsModal);
     });
 
-    ipcRenderer.on('reload-plugins', async () => {
-      const { settings } = this.props;
-      await plugins.getPlugins(true);
-      templating.reload();
-      themes.setTheme(settings.theme);
-      console.log('[plugins] reloaded');
-    });
+    ipcRenderer.on('reload-plugins', this._handleReloadPlugins);
 
     ipcRenderer.on('toggle-preferences-shortcuts', () => {
       showModal(SettingsModal, TAB_INDEX_SHORTCUTS);
@@ -860,7 +970,7 @@ class App extends PureComponent {
       e => {
         e.preventDefault();
       },
-      false
+      false,
     );
 
     document.addEventListener(
@@ -888,12 +998,12 @@ class App extends PureComponent {
               Import <code>{path}</code>?
             </span>
           ),
-          addCancel: true
+          addCancel: true,
         });
 
         handleImportUriToWorkspace(activeWorkspace._id, uri);
       },
-      false
+      false,
     );
 
     ipcRenderer.on('toggle-sidebar', this._handleToggleSidebar);
@@ -928,27 +1038,22 @@ class App extends PureComponent {
     // Prevent rendering of everything
     this._isMigratingChildren = true;
 
-    await db.bufferChanges();
-    if (baseEnvironments.length === 0) {
-      await models.environment.create({ parentId: activeWorkspace._id });
-      console.log(`[app] Created missing base environment for ${activeWorkspace.name}`);
-    }
+    const flushId = await db.bufferChanges();
+    await models.environment.getOrCreateForWorkspace(activeWorkspace);
+    await models.cookieJar.getOrCreateForParentId(activeWorkspace._id);
+    await db.flushChanges(flushId);
 
-    if (!activeCookieJar) {
-      await models.cookieJar.create({
-        parentId: this.props.activeWorkspace._id
-      });
-      console.log(`[app] Created missing cookie jar for ${activeWorkspace.name}`);
-    }
-
-    await db.flushChanges();
-
-    // Flush "transaction"
     this._isMigratingChildren = false;
   }
 
   componentWillReceiveProps(nextProps) {
     this._ensureWorkspaceChildren(nextProps);
+
+    // Update VCS if needed
+    const { activeWorkspace } = this.props;
+    if (nextProps.activeWorkspace._id !== activeWorkspace._id) {
+      this._updateVCS(nextProps.activeWorkspace);
+    }
   }
 
   componentWillMount() {
@@ -961,19 +1066,32 @@ class App extends PureComponent {
       return null;
     }
 
+    const { activeWorkspace } = this.props;
+
+    const {
+      paneWidth,
+      paneHeight,
+      sidebarWidth,
+      isVariableUncovered,
+      vcs,
+      forceRefreshCounter,
+      forceRefreshHeaderCounter,
+    } = this.state;
+
+    const uniquenessKey = `${forceRefreshCounter}::${activeWorkspace._id}`;
+
     return (
-      <KeydownBinder
-        onKeydown={this._handleKeyDown}
-        key={this.props.activeWorkspace ? this.props.activeWorkspace._id : 'n/a'}>
-        <div className="app">
+      <KeydownBinder onKeydown={this._handleKeyDown}>
+        <div className="app" key={uniquenessKey}>
           <ErrorBoundary showAlert>
             <Wrapper
               {...this.props}
               ref={this._setWrapperRef}
-              paneWidth={this.state.paneWidth}
-              paneHeight={this.state.paneHeight}
-              sidebarWidth={this.state.sidebarWidth}
+              paneWidth={paneWidth}
+              paneHeight={paneHeight}
+              sidebarWidth={sidebarWidth}
               handleCreateRequestForWorkspace={this._requestCreateForWorkspace}
+              handleSetRequestPinned={this._handleSetRequestPinned}
               handleSetRequestGroupCollapsed={this._handleSetRequestGroupCollapsed}
               handleActivateRequest={this._handleSetActiveRequest}
               handleSetRequestPaneRef={this._setRequestPaneRef}
@@ -989,11 +1107,11 @@ class App extends PureComponent {
               handleRender={this._handleRenderText}
               handleGetRenderContext={this._handleGetRenderContext}
               handleDuplicateRequest={this._requestDuplicate}
-              handleDuplicateRequestGroup={this._requestGroupDuplicate}
-              handleMoveRequestGroup={this._requestGroupMove}
+              handleDuplicateRequestGroup={App._requestGroupDuplicate}
+              handleMoveRequestGroup={App._requestGroupMove}
               handleDuplicateWorkspace={this._workspaceDuplicate}
               handleCreateRequestGroup={this._requestGroupCreate}
-              handleGenerateCode={this._handleGenerateCode}
+              handleGenerateCode={App._handleGenerateCode}
               handleGenerateCodeForActiveRequest={this._handleGenerateCodeForActiveRequest}
               handleCopyAsCurl={this._handleCopyAsCurl}
               handleSetResponsePreviewMode={this._handleSetResponsePreviewMode}
@@ -1008,7 +1126,11 @@ class App extends PureComponent {
               handleSetSidebarFilter={this._handleSetSidebarFilter}
               handleToggleMenuBar={this._handleToggleMenuBar}
               handleUpdateRequestMimeType={this._handleUpdateRequestMimeType}
-              isVariableUncovered={this.state.isVariableUncovered}
+              handleShowExportRequestsModal={this._handleShowExportRequestsModal}
+              handleUpdateDownloadPath={this._handleUpdateDownloadPath}
+              isVariableUncovered={isVariableUncovered}
+              headerEditorKey={forceRefreshHeaderCounter + ''}
+              vcs={vcs}
             />
           </ErrorBoundary>
 
@@ -1031,26 +1153,34 @@ App.propTypes = {
   paneHeight: PropTypes.number.isRequired,
   handleCommand: PropTypes.func.isRequired,
   settings: PropTypes.object.isRequired,
+  isLoggedIn: PropTypes.bool.isRequired,
   activeWorkspace: PropTypes.shape({
-    _id: PropTypes.string.isRequired
+    _id: PropTypes.string.isRequired,
   }).isRequired,
   handleSetActiveWorkspace: PropTypes.func.isRequired,
 
   // Optional
   activeRequest: PropTypes.object,
   activeEnvironment: PropTypes.shape({
-    _id: PropTypes.string.isRequired
-  })
+    _id: PropTypes.string.isRequired,
+  }),
 };
 
 function mapStateToProps(state, props) {
   const { entities, global } = state;
 
-  const { isLoading, loadingRequestIds } = global;
+  const { isLoading, loadingRequestIds, isLoggedIn } = global;
 
   // Entities
   const entitiesLists = selectEntitiesLists(state, props);
-  const { workspaces, environments, requests, requestGroups } = entitiesLists;
+  const {
+    workspaces,
+    environments,
+    requests,
+    requestGroups,
+    requestMetas,
+    requestVersions,
+  } = entitiesLists;
 
   const settings = entitiesLists.settings[0];
 
@@ -1070,6 +1200,7 @@ function mapStateToProps(state, props) {
   const responsePreviewMode = requestMeta.previewMode || PREVIEW_MODE_SOURCE;
   const responseFilter = requestMeta.responseFilter || '';
   const responseFilterHistory = requestMeta.responseFilterHistory || [];
+  const responseDownloadPath = requestMeta.downloadPath || null;
 
   // Cookie Jar
   const activeCookieJar = selectActiveCookieJar(state, props);
@@ -1091,33 +1222,41 @@ function mapStateToProps(state, props) {
   const workspaceChildren = selectWorkspaceRequestsAndRequestGroups(state, props);
   const unseenWorkspaces = selectUnseenWorkspaces(state, props);
 
+  // Sync stuff
+  const syncItems = selectSyncItems(state, props);
+
   return Object.assign({}, state, {
-    settings,
-    workspaces,
-    unseenWorkspaces,
-    requestGroups,
-    requests,
-    oAuth2Token,
-    isLoading,
-    loadStartTime,
-    activeWorkspace,
-    activeWorkspaceClientCertificates,
+    activeCookieJar,
+    activeEnvironment,
     activeRequest,
     activeRequestResponses,
     activeResponse,
-    activeCookieJar,
-    sidebarHidden,
-    sidebarFilter,
-    sidebarWidth,
-    paneWidth,
+    activeWorkspace,
+    activeWorkspaceClientCertificates,
+    environments,
+    isLoading,
+    isLoggedIn,
+    loadStartTime,
+    oAuth2Token,
     paneHeight,
-    responsePreviewMode,
+    paneWidth,
+    requestGroups,
+    requestMetas,
+    requestVersions,
+    requests,
+    responseDownloadPath,
     responseFilter,
     responseFilterHistory,
+    responsePreviewMode,
+    settings,
     sidebarChildren,
-    environments,
-    activeEnvironment,
-    workspaceChildren
+    sidebarFilter,
+    sidebarHidden,
+    sidebarWidth,
+    syncItems,
+    unseenWorkspaces,
+    workspaceChildren,
+    workspaces,
   });
 }
 
@@ -1132,8 +1271,9 @@ function mapDispatchToProps(dispatch) {
     handleImportFileToWorkspace: global.importFile,
     handleImportUriToWorkspace: global.importUri,
     handleCommand: global.newCommand,
-    handleExportFile: global.exportFile,
-    handleMoveDoc: _moveDoc
+    handleExportFile: global.exportWorkspacesToFile,
+    handleExportRequestsToFile: global.exportRequestsToFile,
+    handleMoveDoc: _moveDoc,
   };
 }
 
@@ -1165,7 +1305,7 @@ async function _moveDoc(docToMove, parentId, targetId, targetOffset) {
   // NOTE: using requestToTarget's parentId so we can switch parents!
   let docs = [
     ...(await models.request.findByParentId(parentId)),
-    ...(await models.requestGroup.findByParentId(parentId))
+    ...(await models.requestGroup.findByParentId(parentId)),
   ].sort((a, b) => (a.metaSortKey < b.metaSortKey ? -1 : 1));
 
   // Find the index of doc B so we can re-order and save everything
@@ -1207,5 +1347,5 @@ async function _moveDoc(docToMove, parentId, targetId, targetOffset) {
 
 export default connect(
   mapStateToProps,
-  mapDispatchToProps
+  mapDispatchToProps,
 )(App);

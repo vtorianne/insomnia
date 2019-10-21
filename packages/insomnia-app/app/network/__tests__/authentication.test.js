@@ -3,7 +3,7 @@ import { AUTH_OAUTH_1 } from '../../common/constants';
 
 describe('OAuth 1.0', () => {
   it('Does OAuth 1.0', async () => {
-    const header = await getAuthHeader('req_123', 'https://insomnia.rest/', 'GET', {
+    const authentication = {
       type: AUTH_OAUTH_1,
       consumerKey: 'consumerKey',
       consumerSecret: 'consumerSecret',
@@ -12,8 +12,10 @@ describe('OAuth 1.0', () => {
       tokenSecret: 'tokenSecret',
       signatureMethod: 'HMAC-SHA1',
       nonce: 'nonce',
-      timestamp: '1234567890'
-    });
+      timestamp: '1234567890',
+    };
+    const request = { url: 'https://insomnia.rest/', method: 'GET', authentication };
+    const header = await getAuthHeader(request, 'https://insomnia.rest/');
 
     expect(header).toEqual({
       name: 'Authorization',
@@ -25,13 +27,13 @@ describe('OAuth 1.0', () => {
         'oauth_signature_method="HMAC-SHA1"',
         'oauth_timestamp="1234567890"',
         'oauth_token="tokenKey"',
-        'oauth_version="1.0"'
-      ].join(', ')
+        'oauth_version="1.0"',
+      ].join(', '),
     });
   });
 
   it('Does OAuth 1.0 with RSA-SHA1', async () => {
-    const header = await getAuthHeader('req_123', 'https://insomnia.rest/', 'GET', {
+    const authentication = {
       type: AUTH_OAUTH_1,
       consumerKey: 'consumerKey',
       consumerSecret: 'consumerSecret',
@@ -56,8 +58,10 @@ describe('OAuth 1.0', () => {
         'F29dI2yG3Ti+28/WlSdfYGe9P9SfeYM7RQbNbUp1MHWrkg==\n' +
         '-----END RSA PRIVATE KEY-----',
       nonce: 'nonce',
-      timestamp: '1234567890'
-    });
+      timestamp: '1234567890',
+    };
+    const request = { url: 'https://insomnia.rest/', method: 'GET', authentication };
+    const header = await getAuthHeader(request, 'https://insomnia.rest/');
 
     expect(header).toEqual({
       name: 'Authorization',
@@ -69,18 +73,20 @@ describe('OAuth 1.0', () => {
         'oauth_signature_method="RSA-SHA1"',
         'oauth_timestamp="1234567890"',
         'oauth_token="tokenKey"',
-        'oauth_version="1.0"'
-      ].join(', ')
+        'oauth_version="1.0"',
+      ].join(', '),
     });
   });
 
   it('Does OAuth 1.0 with defaults', async () => {
-    const header = await getAuthHeader('req_123', 'https://insomnia.rest/', 'GET', {
+    const authentication = {
       type: AUTH_OAUTH_1,
       consumerKey: 'consumerKey',
       consumerSecret: 'consumerSecret',
-      signatureMethod: 'HMAC-SHA1'
-    });
+      signatureMethod: 'HMAC-SHA1',
+    };
+    const request = { url: 'https://insomnia.rest/', method: 'GET', authentication };
+    const header = await getAuthHeader(request, 'https://insomnia.rest/');
 
     expect(header.name).toBe('Authorization');
     expect(header.value).toMatch(
@@ -91,9 +97,9 @@ describe('OAuth 1.0', () => {
           'oauth_signature="[\\w\\d%]*"',
           'oauth_signature_method="HMAC-SHA1"',
           'oauth_timestamp="\\d*"',
-          'oauth_version="1\\.0"'
-        ].join(', ')
-      )
+          'oauth_version="1\\.0"',
+        ].join(', '),
+      ),
     );
   });
 });

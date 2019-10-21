@@ -6,6 +6,7 @@ export const name = 'Client Certificate';
 export const type = 'ClientCertificate';
 export const prefix = 'crt';
 export const canDuplicate = true;
+export const canSync = false;
 
 type BaseClientCertificate = {
   parentId: string,
@@ -17,7 +18,7 @@ type BaseClientCertificate = {
   disabled: boolean,
 
   // For sync control
-  isPrivate: boolean
+  isPrivate: boolean,
 };
 
 export type ClientCertificate = BaseModel & BaseClientCertificate;
@@ -31,7 +32,7 @@ export function init(): BaseClientCertificate {
     cert: null,
     key: null,
     pfx: null,
-    isPrivate: false
+    isPrivate: false,
   };
 }
 

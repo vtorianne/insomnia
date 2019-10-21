@@ -1,5 +1,5 @@
 const { CookieJar } = require('tough-cookie');
-const { cookieToString, jarFromCookies, cookiesFromJar } = require('..');
+const { jarFromCookies, cookiesFromJar } = require('..');
 
 describe('jarFromCookies()', () => {
   it('returns valid cookies', done => {
@@ -7,8 +7,8 @@ describe('jarFromCookies()', () => {
       {
         key: 'foo',
         value: 'bar',
-        domain: 'google.com'
-      }
+        domain: 'google.com',
+      },
     ]);
 
     jar.store.getAllCookies((err, cookies) => {
@@ -36,12 +36,12 @@ describe('cookiesFromJar()', () => {
         key: 'bar',
         value: 'baz',
         domain: 'insomnia.rest',
-        expires: d
+        expires: d,
       },
       {
         // This one will fail to parse, and be skipped
-        bad: 'cookie'
-      }
+        bad: 'cookie',
+      },
     ];
 
     const jar = CookieJar.fromJSON({ cookies: initialCookies });

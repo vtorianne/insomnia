@@ -1,5 +1,11 @@
 // @flow
-import type { Request } from '../../models/request';
+import type {
+  Request,
+  RequestAuthentication,
+  RequestBody,
+  RequestHeader,
+  RequestParameter,
+} from '../../models/request';
 import type { Workspace } from '../../models/workspace';
 import type { OAuth2Token } from '../../models/o-auth-2-token';
 
@@ -14,7 +20,7 @@ import RenderedQueryString from './rendered-query-string';
 import BodyEditor from './editors/body/body-editor';
 import AuthWrapper from './editors/auth/auth-wrapper';
 import RequestUrlBar from './request-url-bar.js';
-import { DEBOUNCE_MILLIS, getAuthTypeName, getContentTypeName } from '../../common/constants';
+import { getAuthTypeName, getContentTypeName } from '../../common/constants';
 import { deconstructQueryStringToParams, extractQueryStringFromUrl } from 'insomnia-url';
 import * as db from '../../common/database';
 import * as models from '../../models';
@@ -23,26 +29,27 @@ import { showModal } from './modals/index';
 import RequestSettingsModal from './modals/request-settings-modal';
 import MarkdownPreview from './markdown-preview';
 import type { Settings } from '../../models/settings';
-import * as hotkeys from '../../common/hotkeys';
 import ErrorBoundary from './error-boundary';
+import { hotKeyRefs } from '../../common/hotkeys';
 
 type Props = {
   // Functions
-  forceUpdateRequest: Function,
-  forceUpdateRequestHeaders: Function,
-  handleSend: Function,
-  handleSendAndDownload: Function,
-  handleCreateRequest: Function,
+  forceUpdateRequest: (r: Request, patch: Object) => Promise<Request>,
+  forceUpdateRequestHeaders: (r: Request, headers: Array<RequestHeader>) => Promise<Request>,
+  handleSend: () => void,
+  handleSendAndDownload: (filepath?: string) => Promise<void>,
+  handleCreateRequest: () => Promise<Request>,
   handleGenerateCode: Function,
   handleRender: Function,
   handleGetRenderContext: Function,
-  updateRequestUrl: Function,
-  updateRequestMethod: Function,
-  updateRequestBody: Function,
-  updateRequestParameters: Function,
-  updateRequestAuthentication: Function,
-  updateRequestHeaders: Function,
-  updateRequestMimeType: Function,
+  handleUpdateDownloadPath: Function,
+  updateRequestUrl: (r: Request, url: string) => Promise<Request>,
+  updateRequestMethod: (r: Request, method: string) => Promise<Request>,
+  updateRequestBody: (r: Request, body: RequestBody) => Promise<Request>,
+  updateRequestParameters: (r: Request, params: Array<RequestParameter>) => Promise<Request>,
+  updateRequestAuthentication: (r: Request, auth: RequestAuthentication) => Promise<Request>,
+  updateRequestHeaders: (r: Request, headers: Array<RequestHeader>) => Promise<Request>,
+  updateRequestMimeType: (r: Request, mimeType: string) => Promise<Request>,
   updateSettingsShowPasswords: Function,
   updateSettingsUseBulkHeaderEditor: Function,
   handleImport: Function,
@@ -54,16 +61,16 @@ type Props = {
   isVariableUncovered: boolean,
   environmentId: string,
   forceRefreshCounter: number,
+  headerEditorKey: string,
 
   // Optional
   request: ?Request,
-  oAuth2Token: ?OAuth2Token
+  downloadPath: string | null,
+  oAuth2Token: ?OAuth2Token,
 };
 
 @autobind
 class RequestPane extends React.PureComponent<Props> {
-  _handleUpdateRequestUrlTimeout: TimeoutID;
-
   _handleEditDescriptionAdd() {
     this._handleEditDescription(true);
   }
@@ -71,7 +78,7 @@ class RequestPane extends React.PureComponent<Props> {
   _handleEditDescription(addDescription: boolean) {
     showModal(RequestSettingsModal, {
       request: this.props.request,
-      forceEditMode: addDescription
+      forceEditMode: addDescription,
     });
   }
 
@@ -85,7 +92,7 @@ class RequestPane extends React.PureComponent<Props> {
         (d: any) =>
           d.type === models.request.type && // Only requests
           d._id !== requestId && // Not current request
-          (d.url || '') // Only ones with non-empty URLs
+          (d.url || ''), // Only ones with non-empty URLs
       )
       .map((r: any) => (r.url || '').trim());
 
@@ -102,18 +109,18 @@ class RequestPane extends React.PureComponent<Props> {
   }
 
   _handleCreateRequest() {
-    this.props.handleCreateRequest(this.props.request);
+    this.props.handleCreateRequest();
   }
 
-  _handleUpdateRequestUrl(url: string) {
-    clearTimeout(this._handleUpdateRequestUrlTimeout);
-    this._handleUpdateRequestUrlTimeout = setTimeout(() => {
-      this.props.updateRequestUrl(url);
-    }, DEBOUNCE_MILLIS);
+  _handleUpdateRequestParameters(parameters: Array<RequestParameter>) {
+    const { request, updateRequestParameters } = this.props;
+    if (request) {
+      updateRequestParameters(request, parameters);
+    }
   }
 
   _handleImportQueryFromUrl() {
-    const { request } = this.props;
+    const { request, forceUpdateRequest } = this.props;
 
     if (!request) {
       console.warn('Tried to import query when no request active');
@@ -134,7 +141,7 @@ class RequestPane extends React.PureComponent<Props> {
 
     // Only update if url changed
     if (url !== request.url) {
-      this.props.forceUpdateRequest({ url, parameters });
+      forceUpdateRequest(request, { url, parameters });
     }
   }
 
@@ -148,6 +155,7 @@ class RequestPane extends React.PureComponent<Props> {
       handleRender,
       handleSend,
       handleSendAndDownload,
+      handleUpdateDownloadPath,
       oAuth2Token,
       request,
       workspace,
@@ -157,15 +165,19 @@ class RequestPane extends React.PureComponent<Props> {
       updateRequestAuthentication,
       updateRequestBody,
       updateRequestHeaders,
-      updateRequestMethod,
       updateRequestMimeType,
-      updateRequestParameters,
-      updateSettingsShowPasswords
+      updateSettingsShowPasswords,
+      updateRequestMethod,
+      updateRequestUrl,
+      headerEditorKey,
+      downloadPath,
     } = this.props;
 
     const paneClasses = 'request-pane theme--pane pane';
     const paneHeaderClasses = 'pane__header theme--pane__header';
     const paneBodyClasses = 'pane__body theme--pane__body';
+
+    const hotKeyRegistry = settings.hotKeyRegistry;
 
     if (!request) {
       return (
@@ -179,7 +191,10 @@ class RequestPane extends React.PureComponent<Props> {
                     <td>New Request</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.CREATE_REQUEST} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_SHOW_CREATE.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -187,7 +202,10 @@ class RequestPane extends React.PureComponent<Props> {
                     <td>Switch Requests</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.SHOW_QUICK_SWITCHER} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_QUICK_SWITCH.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -195,7 +213,10 @@ class RequestPane extends React.PureComponent<Props> {
                     <td>Edit Environments</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.SHOW_ENVIRONMENTS} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.ENVIRONMENT_SHOW_EDITOR.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -235,9 +256,8 @@ class RequestPane extends React.PureComponent<Props> {
           <ErrorBoundary errorClassName="font-error pad text-center">
             <RequestUrlBar
               uniquenessKey={uniqueKey}
-              method={request.method}
               onMethodChange={updateRequestMethod}
-              onUrlChange={this._handleUpdateRequestUrl}
+              onUrlChange={updateRequestUrl}
               handleAutocompleteUrls={this._autocompleteUrls}
               handleImport={handleImport}
               handleGenerateCode={handleGenerateCode}
@@ -247,14 +267,16 @@ class RequestPane extends React.PureComponent<Props> {
               nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
               isVariableUncovered={isVariableUncovered}
               handleGetRenderContext={handleGetRenderContext}
-              url={request.url}
-              requestId={request._id}
+              request={request}
+              hotKeyRegistry={settings.hotKeyRegistry}
+              handleUpdateDownloadPath={handleUpdateDownloadPath}
+              downloadPath={downloadPath}
             />
           </ErrorBoundary>
         </header>
         <Tabs className={paneBodyClasses + ' react-tabs'} forceRenderTabPanel>
           <TabList>
-            <Tab>
+            <Tab tabIndex="-1">
               <ContentTypeDropdown
                 onChange={updateRequestMimeType}
                 contentType={request.body.mimeType}
@@ -267,28 +289,28 @@ class RequestPane extends React.PureComponent<Props> {
                 <i className="fa fa-caret-down space-left" />
               </ContentTypeDropdown>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <AuthDropdown
                 onChange={updateRequestAuthentication}
-                authentication={request.authentication}
+                request={request}
                 className="tall">
                 {getAuthTypeName(request.authentication.type) || 'Auth'}
                 <i className="fa fa-caret-down space-left" />
               </AuthDropdown>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <button>
                 Query
                 {numParameters > 0 && <span className="bubble space-left">{numParameters}</span>}
               </button>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <button>
                 Header
                 {numHeaders > 0 && <span className="bubble space-left">{numHeaders}</span>}
               </button>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <button>
                 Docs
                 {request.description && (
@@ -357,7 +379,7 @@ class RequestPane extends React.PureComponent<Props> {
                   handleGetRenderContext={handleGetRenderContext}
                   nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
                   isVariableUncovered={isVariableUncovered}
-                  onChange={updateRequestParameters}
+                  onChange={this._handleUpdateRequestParameters}
                 />
               </ErrorBoundary>
             </div>
@@ -373,7 +395,7 @@ class RequestPane extends React.PureComponent<Props> {
           <TabPanel className="react-tabs__tab-panel header-editor">
             <ErrorBoundary key={uniqueKey} errorClassName="font-error pad text-center">
               <RequestHeadersEditor
-                headers={request.headers}
+                key={headerEditorKey}
                 handleRender={handleRender}
                 handleGetRenderContext={handleGetRenderContext}
                 nunjucksPowerUserMode={settings.nunjucksPowerUserMode}
@@ -382,6 +404,7 @@ class RequestPane extends React.PureComponent<Props> {
                 editorIndentSize={settings.editorIndentSize}
                 editorLineWrapping={settings.editorLineWrapping}
                 onChange={updateRequestHeaders}
+                request={request}
                 bulk={settings.useBulkHeaderEditor}
               />
             </ErrorBoundary>

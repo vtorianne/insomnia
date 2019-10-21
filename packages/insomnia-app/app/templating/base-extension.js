@@ -2,6 +2,7 @@ import * as models from '../models/index';
 import * as templating from './index';
 import * as pluginContexts from '../plugins/context';
 import * as db from '../common/database';
+import { decodeEncoding } from './utils';
 
 const EMPTY_ARG = '__EMPTY_NUNJUCKS_ARG__';
 
@@ -26,6 +27,10 @@ export default class BaseExtension {
 
   getDescription() {
     return this._ext.description || 'no description';
+  }
+
+  getDisablePreview() {
+    return this._ext.disablePreview || (() => false);
   }
 
   getArgs() {
@@ -66,15 +71,23 @@ export default class BaseExtension {
     // Pull out the purpose
     const renderPurpose = renderContext.getPurpose ? renderContext.getPurpose() : null;
 
+    // Pull out the environment ID
+    const environmentId = renderContext.getEnvironmentId ? renderContext.getEnvironmentId() : 'n/a';
+
     // Extract the rest of the args
-    const args = runArgs.slice(0, runArgs.length - 1).filter(a => a !== EMPTY_ARG);
+    const args = runArgs
+      .slice(0, runArgs.length - 1)
+      .filter(a => a !== EMPTY_ARG)
+      .map(decodeEncoding);
 
     // Define a helper context with utils
     const helperContext = {
       ...pluginContexts.app.init(renderPurpose),
       ...pluginContexts.store.init(this._plugin),
+      ...pluginContexts.network.init(environmentId),
       context: renderContext,
       meta: renderMeta,
+      renderPurpose,
       util: {
         render: str => templating.render(str, { context: renderContext }),
         models: {
@@ -83,24 +96,24 @@ export default class BaseExtension {
             getAncestors: async request => {
               const ancestors = await db.withAncestors(request, [
                 models.requestGroup.type,
-                models.workspace.type
+                models.workspace.type,
               ]);
               return ancestors.filter(doc => doc._id !== request._id);
-            }
+            },
           },
           workspace: { getById: models.workspace.getById },
           oAuth2Token: { getByRequestId: models.oAuth2Token.getByParentId },
           cookieJar: {
             getOrCreateForWorkspace: workspace => {
               return models.cookieJar.getOrCreateForParentId(workspace._id);
-            }
+            },
           },
           response: {
             getLatestForRequestId: models.response.getLatestForRequest,
-            getBodyBuffer: models.response.getBodyBuffer
-          }
-        }
-      }
+            getBodyBuffer: models.response.getBodyBuffer,
+          },
+        },
+      },
     };
 
     let result;

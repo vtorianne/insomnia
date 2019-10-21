@@ -21,12 +21,12 @@ type Props = {
   nunjucksPowerUserMode: boolean,
   isVariableUncovered: boolean,
   workspace: Workspace,
-  cookieJar: CookieJar
+  cookieJar: CookieJar,
 };
 
 type State = {
   cookie: Cookie | null,
-  rawValue: string
+  rawValue: string,
 };
 
 @autobind
@@ -40,7 +40,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
 
     this.state = {
       cookie: null,
-      rawValue: ''
+      rawValue: '',
     };
   }
 
@@ -69,7 +69,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
     this.modal && this.modal.hide();
   }
 
-  async _saveChanges(cookieJar: CookieJar) {
+  static async _saveChanges(cookieJar: CookieJar) {
     await models.cookieJar.update(cookieJar);
   }
 
@@ -131,7 +131,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
 
     this.setState({ cookie });
 
-    await this._saveChanges(cookieJar);
+    await CookieModifyModal._saveChanges(cookieJar);
 
     return cookie;
   }
@@ -162,7 +162,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
     }, DEBOUNCE_MILLIS * 2);
   }
 
-  _capitalize(str: string) {
+  static _capitalize(str: string) {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
@@ -187,7 +187,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
       handleRender,
       handleGetRenderContext,
       nunjucksPowerUserMode,
-      isVariableUncovered
+      isVariableUncovered,
     } = this.props;
 
     if (!cookie) {
@@ -199,7 +199,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
     return (
       <div className="form-control form-control--outlined">
         <label>
-          {this._capitalize(field)} <span className="danger">{error}</span>
+          {CookieModifyModal._capitalize(field)} <span className="danger">{error}</span>
           <OneLineEditor
             render={handleRender}
             getRenderContext={handleGetRenderContext}
@@ -226,10 +226,10 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
             cookie && (
               <Tabs>
                 <TabList>
-                  <Tab>
+                  <Tab tabIndex="-1">
                     <button>Friendly</button>
                   </Tab>
-                  <Tab>
+                  <Tab tabIndex="-1">
                     <button>Raw</button>
                   </Tab>
                 </TabList>
@@ -245,7 +245,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
                     </div>
                     {this._renderInputField(
                       'expires',
-                      isNaN(new Date(cookie.expires || 0).getTime()) ? 'Invalid Date' : null
+                      isNaN(new Date(cookie.expires || 0).getTime()) ? 'Invalid Date' : null,
                     )}
                   </div>
                   <div className="pad no-pad-top cookie-modify__checkboxes row-around txt-lg">
@@ -254,7 +254,7 @@ class CookieModifyModal extends React.PureComponent<Props, State> {
 
                       return (
                         <label key={i}>
-                          {this._capitalize(field)}
+                          {CookieModifyModal._capitalize(field)}
                           <input
                             className="space-left"
                             type="checkbox"

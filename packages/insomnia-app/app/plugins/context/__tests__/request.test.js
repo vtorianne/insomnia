@@ -7,7 +7,7 @@ const CONTEXT = {
   hello: 'world',
   array_test: ['a', 'b'],
   object_test: { a: 'A', b: 'B' },
-  null_test: null
+  null_test: null,
 };
 
 describe('init()', () => {
@@ -17,7 +17,7 @@ describe('init()', () => {
     await models.request.create({
       _id: 'req_1',
       parentId: 'wrk_1',
-      name: 'My Request'
+      name: 'My Request',
     });
   });
 
@@ -27,6 +27,7 @@ describe('init()', () => {
     expect(Object.keys(result.request).sort()).toEqual([
       'addHeader',
       'addParameter',
+      'getAuthentication',
       'getBodyText',
       'getEnvironment',
       'getEnvironmentVariable',
@@ -42,14 +43,17 @@ describe('init()', () => {
       'hasParameter',
       'removeHeader',
       'removeParameter',
+      'setAuthenticationParameter',
       'setBodyText',
       'setCookie',
       'setHeader',
+      'setMethod',
       'setParameter',
+      'setUrl',
       'settingDisableRenderRequestBody',
       'settingEncodeUrl',
       'settingSendCookies',
-      'settingStoreCookies'
+      'settingStoreCookies',
     ]);
   });
 
@@ -57,6 +61,7 @@ describe('init()', () => {
     const result = plugin.init(await models.request.getById('req_1'), CONTEXT, true);
     expect(Object.keys(result)).toEqual(['request']);
     expect(Object.keys(result.request).sort()).toEqual([
+      'getAuthentication',
       'getBodyText',
       'getEnvironment',
       'getEnvironmentVariable',
@@ -69,7 +74,7 @@ describe('init()', () => {
       'getParameters',
       'getUrl',
       'hasHeader',
-      'hasParameter'
+      'hasParameter',
     ]);
   });
 
@@ -87,11 +92,12 @@ describe('request.*', () => {
       parentId: 'wrk_1',
       name: 'My Request',
       body: { text: 'body' },
+      authentication: { type: 'oauth2' },
       headers: [
         { name: 'hello', value: 'world' },
-        { name: 'Content-Type', value: 'application/json' }
+        { name: 'Content-Type', value: 'application/json' },
       ],
-      parameters: [{ name: 'foo', value: 'bar' }, { name: 'message', value: 'Hello World!' }]
+      parameters: [{ name: 'foo', value: 'bar' }, { name: 'message', value: 'Hello World!' }],
     });
   });
 
@@ -102,6 +108,7 @@ describe('request.*', () => {
     expect(result.request.getUrl()).toBe('');
     expect(result.request.getMethod()).toBe('GET');
     expect(result.request.getBodyText()).toBe('body');
+    expect(result.request.getAuthentication()).toEqual({ type: 'oauth2' });
   });
 
   it('works for parameters', async () => {
@@ -110,7 +117,7 @@ describe('request.*', () => {
     // getParameters()
     expect(result.request.getParameters()).toEqual([
       { name: 'foo', value: 'bar' },
-      { name: 'message', value: 'Hello World!' }
+      { name: 'message', value: 'Hello World!' },
     ]);
 
     // getParameter()
@@ -141,7 +148,7 @@ describe('request.*', () => {
     // getHeaders()
     expect(result.request.getHeaders()).toEqual([
       { name: 'hello', value: 'world' },
-      { name: 'Content-Type', value: 'application/json' }
+      { name: 'Content-Type', value: 'application/json' },
     ]);
 
     // getHeader()
@@ -189,7 +196,7 @@ describe('request.*', () => {
       hello: 'world',
       array_test: ['a', 'b'],
       object_test: { a: 'A', b: 'B' },
-      null_test: null
+      null_test: null,
     });
 
     // getEnvironmentVariable
@@ -198,9 +205,21 @@ describe('request.*', () => {
     expect(result.request.getEnvironmentVariable('array_test')).toEqual(['a', 'b']);
     expect(result.request.getEnvironmentVariable('object_test')).toEqual({
       a: 'A',
-      b: 'B'
+      b: 'B',
     });
     expect(result.request.getEnvironmentVariable('null_test')).toBe(null);
     expect(result.request.getEnvironmentVariable('bad')).toBeUndefined();
+  });
+
+  it('works for authentication', async () => {
+    const request = await models.request.getById('req_1');
+    request.authentication = {}; // Because the plugin technically needs a RenderedRequest
+
+    const result = plugin.init(request, CONTEXT);
+
+    result.request.setAuthenticationParameter('foo', 'bar');
+    result.request.setAuthenticationParameter('foo', 'baz');
+    expect(result.request.getAuthentication()).toEqual({ foo: 'baz' });
+    expect(request.authentication).toEqual({ foo: 'baz' });
   });
 });

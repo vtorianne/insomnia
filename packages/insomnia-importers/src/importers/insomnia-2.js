@@ -1,7 +1,5 @@
 'use strict';
 
-const utils = require('../utils');
-
 module.exports.id = 'insomnia-2';
 module.exports.name = 'Insomnia v2';
 module.exports.description = 'Insomnia export format 2';
@@ -31,7 +29,7 @@ module.exports.convert = function(rawData) {
     const mimeType = contentTypeHeader ? contentTypeHeader.value.split(';')[0] : null;
     resource.body = {
       mimeType: mimeType || '',
-      text: resource.body
+      text: resource.body,
     };
   }
 

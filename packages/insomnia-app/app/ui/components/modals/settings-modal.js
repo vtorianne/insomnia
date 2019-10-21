@@ -16,9 +16,9 @@ import Theme from '../settings/theme';
 import * as models from '../../../models/index';
 import { Curl } from 'insomnia-libcurl';
 import { getAppName, getAppVersion } from '../../../common/constants';
-import * as session from '../../../sync/session';
 import Tooltip from '../tooltip';
 import { setTheme } from '../../../plugins/misc';
+import * as session from '../../../account/session';
 
 export const TAB_INDEX_EXPORT = 1;
 export const TAB_INDEX_SHORTCUTS = 3;
@@ -43,8 +43,8 @@ class SettingsModal extends PureComponent {
     this.modal.hide();
   }
 
-  _handleExportWorkspace() {
-    this.props.handleExportWorkspaceToFile();
+  _handleShowExportRequestsModal() {
+    this.props.handleShowExportRequestsModal();
     this.modal.hide();
   }
 
@@ -66,6 +66,10 @@ class SettingsModal extends PureComponent {
     }
   }
 
+  async _handleUpdateKeyBindings(hotKeyRegistry) {
+    models.settings.update(this.props.settings, { hotKeyRegistry });
+  }
+
   show(currentTabIndex = 0) {
     this.setState({ currentTabIndex });
     this.modal.show();
@@ -78,7 +82,7 @@ class SettingsModal extends PureComponent {
   render() {
     const { settings } = this.props;
     const { currentTabIndex } = this.state;
-    const email = session.isLoggedIn() ? session.getEmail() : null;
+    const email = session.isLoggedIn() ? session.getFullName() : null;
 
     return (
       <Modal ref={this._setModalRef} tall freshState {...this.props}>
@@ -95,25 +99,25 @@ class SettingsModal extends PureComponent {
         <ModalBody noScroll>
           <Tabs className="react-tabs" defaultIndex={currentTabIndex}>
             <TabList>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="General">General</Button>
               </Tab>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="Import/Export">Data</Button>
               </Tab>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="Themes">Themes</Button>
               </Tab>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="Shortcuts">Keyboard</Button>
               </Tab>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="Account">Account</Button>
               </Tab>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="Plugins">Plugins</Button>
               </Tab>
-              <Tab>
+              <Tab tabIndex="-1">
                 <Button value="About">About</Button>
               </Tab>
             </TabList>
@@ -128,7 +132,7 @@ class SettingsModal extends PureComponent {
             <TabPanel className="react-tabs__tab-panel pad scrollable">
               <ImportExport
                 handleExportAll={this._handleExportAllToFile}
-                handleExportWorkspace={this._handleExportWorkspace}
+                handleShowExportRequestsModal={this._handleShowExportRequestsModal}
                 handleImportFile={this._handleImportFile}
                 handleImportUri={this._handleImportUri}
               />
@@ -137,7 +141,10 @@ class SettingsModal extends PureComponent {
               <Theme handleChangeTheme={this._handleChangeTheme} activeTheme={settings.theme} />
             </TabPanel>
             <TabPanel className="react-tabs__tab-panel pad scrollable">
-              <SettingsShortcuts />
+              <SettingsShortcuts
+                hotKeyRegistry={settings.hotKeyRegistry}
+                handleUpdateKeyBindings={this._handleUpdateKeyBindings}
+              />
             </TabPanel>
             <TabPanel className="react-tabs__tab-panel pad scrollable">
               <Account />
@@ -157,14 +164,14 @@ class SettingsModal extends PureComponent {
 
 SettingsModal.propTypes = {
   // Functions
-  handleExportWorkspaceToFile: PropTypes.func.isRequired,
+  handleShowExportRequestsModal: PropTypes.func.isRequired,
   handleExportAllToFile: PropTypes.func.isRequired,
   handleImportFile: PropTypes.func.isRequired,
   handleImportUri: PropTypes.func.isRequired,
   handleToggleMenuBar: PropTypes.func.isRequired,
 
   // Properties
-  settings: PropTypes.object.isRequired
+  settings: PropTypes.object.isRequired,
 };
 
 export default SettingsModal;

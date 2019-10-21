@@ -6,13 +6,14 @@ export const name = 'Stats';
 export const type = 'Stats';
 export const prefix = 'sta';
 export const canDuplicate = false;
+export const canSync = false;
 
 type BaseStats = {
   currentLaunch: number | null,
   lastLaunch: number | null,
   currentVersion: string | null,
   lastVersion: string | null,
-  launches: number
+  launches: number,
 };
 
 export type Stats = BaseModel & BaseStats;
@@ -23,7 +24,7 @@ export function init(): BaseStats {
     lastLaunch: null,
     currentVersion: null,
     lastVersion: null,
-    launches: 0
+    launches: 0,
   };
 }
 

@@ -21,11 +21,13 @@ import ResponseHeadersViewer from './viewers/response-headers-viewer';
 import ResponseCookiesViewer from './viewers/response-cookies-viewer';
 import * as models from '../../models';
 import { PREVIEW_MODE_SOURCE } from '../../common/constants';
-import { getSetCookieHeaders, nullFn } from '../../common/misc';
+import { getSetCookieHeaders } from '../../common/misc';
 import { cancelCurrentRequest } from '../../network/network';
 import Hotkey from './hotkey';
-import * as hotkeys from '../../common/hotkeys';
 import ErrorBoundary from './error-boundary';
+import type { HotKeyRegistry } from '../../common/hotkeys';
+import { hotKeyRefs } from '../../common/hotkeys';
+import type { RequestVersion } from '../../models/request-version';
 
 type Props = {
   // Functions
@@ -47,14 +49,22 @@ type Props = {
   editorLineWrapping: boolean,
   loadStartTime: number,
   responses: Array<Response>,
+  hotKeyRegistry: HotKeyRegistry,
 
   // Other
+  requestVersions: Array<RequestVersion>,
   request: ?Request,
-  response: ?Response
+  response: ?Response,
 };
 
 @autobind
 class ResponsePane extends React.PureComponent<Props> {
+  _responseViewer: any;
+
+  _setResponseViewerRef(n: any) {
+    this._responseViewer = n;
+  }
+
   _handleGetResponseBody(): Buffer | null {
     if (!this.props.response) {
       return null;
@@ -77,7 +87,7 @@ class ResponsePane extends React.PureComponent<Props> {
     const options = {
       title: 'Save Response Body',
       buttonLabel: 'Save',
-      defaultPath: `${request.name.replace(/ +/g, '_')}-${Date.now()}.${extension}`
+      defaultPath: `${request.name.replace(/ +/g, '_')}-${Date.now()}.${extension}`,
     };
 
     remote.dialog.showSaveDialog(options, outputPath => {
@@ -96,7 +106,7 @@ class ResponsePane extends React.PureComponent<Props> {
     });
   }
 
-  _handleDownloadFullResponseBody() {
+  async _handleDownloadFullResponseBody() {
     const { response, request } = this.props;
 
     if (!response || !request) {
@@ -105,7 +115,8 @@ class ResponsePane extends React.PureComponent<Props> {
       return;
     }
 
-    const headers = response.timeline
+    const timeline = await models.response.getTimeline(response);
+    const headers = timeline
       .filter(v => v.name === 'HEADER_IN')
       .map(v => v.value)
       .join('');
@@ -113,7 +124,7 @@ class ResponsePane extends React.PureComponent<Props> {
     const options = {
       title: 'Save Full Response',
       buttonLabel: 'Save',
-      defaultPath: `${request.name.replace(/ +/g, '_')}-${Date.now()}.txt`
+      defaultPath: `${request.name.replace(/ +/g, '_')}-${Date.now()}.txt`,
     };
 
     remote.dialog.showSaveDialog(options, filename => {
@@ -133,10 +144,22 @@ class ResponsePane extends React.PureComponent<Props> {
     });
   }
 
+  _handleTabSelect(index: number, lastIndex: number) {
+    if (this._responseViewer != null && index === 0 && index !== lastIndex) {
+      // Fix for CodeMirror editor not updating its content.
+      // Refresh must be called when the editor is visible,
+      // so use nextTick to give time for it to be visible.
+      process.nextTick(() => {
+        this._responseViewer.refresh();
+      });
+    }
+  }
+
   render() {
     const {
       request,
       responses,
+      requestVersions,
       response,
       previewMode,
       handleShowRequestSettings,
@@ -152,7 +175,8 @@ class ResponsePane extends React.PureComponent<Props> {
       editorKeyMap,
       filter,
       filterHistory,
-      showCookiesModal
+      showCookiesModal,
+      hotKeyRegistry,
     } = this.props;
 
     const paneClasses = 'response-pane theme--pane pane';
@@ -180,7 +204,10 @@ class ResponsePane extends React.PureComponent<Props> {
                     <td>Send Request</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.SEND_REQUEST} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_SEND.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -188,7 +215,10 @@ class ResponsePane extends React.PureComponent<Props> {
                     <td>Focus Url Bar</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.FOCUS_URL} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_FOCUS_URL.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -196,7 +226,10 @@ class ResponsePane extends React.PureComponent<Props> {
                     <td>Manage Cookies</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.SHOW_COOKIES} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.SHOW_COOKIES_EDITOR.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -204,7 +237,10 @@ class ResponsePane extends React.PureComponent<Props> {
                     <td>Edit Environments</td>
                     <td className="text-right">
                       <code>
-                        <Hotkey hotkey={hotkeys.SHOW_ENVIRONMENTS} />
+                        <Hotkey
+                          keyBindings={hotKeyRegistry[hotKeyRefs.ENVIRONMENT_SHOW_EDITOR.id]}
+                          useFallbackMessage
+                        />
                       </code>
                     </td>
                   </tr>
@@ -232,19 +268,22 @@ class ResponsePane extends React.PureComponent<Props> {
             <ResponseHistoryDropdown
               activeResponse={response}
               responses={responses}
+              requestVersions={requestVersions}
               requestId={request._id}
               handleSetActiveResponse={handleSetActiveResponse}
               handleDeleteResponses={handleDeleteResponses}
               handleDeleteResponse={handleDeleteResponse}
-              onChange={nullFn}
               className="tall pane__header__right"
               right
             />
           </header>
         )}
-        <Tabs className={paneBodyClasses + ' react-tabs'} forceRenderTabPanel>
+        <Tabs
+          className={paneBodyClasses + ' react-tabs'}
+          onSelect={this._handleTabSelect}
+          forceRenderTabPanel>
           <TabList>
-            <Tab>
+            <Tab tabIndex="-1">
               <PreviewModeDropdown
                 download={this._handleDownloadResponseBody}
                 fullDownload={this._handleDownloadFullResponseBody}
@@ -252,7 +291,7 @@ class ResponsePane extends React.PureComponent<Props> {
                 updatePreviewMode={handleSetPreviewMode}
               />
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <Button>
                 Header{' '}
                 {response.headers.length > 0 && (
@@ -260,7 +299,7 @@ class ResponsePane extends React.PureComponent<Props> {
                 )}
               </Button>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <Button>
                 Cookie{' '}
                 {cookieHeaders.length ? (
@@ -268,12 +307,13 @@ class ResponsePane extends React.PureComponent<Props> {
                 ) : null}
               </Button>
             </Tab>
-            <Tab>
+            <Tab tabIndex="-1">
               <Button>Timeline</Button>
             </Tab>
           </TabList>
           <TabPanel className="react-tabs__tab-panel">
             <ResponseViewer
+              ref={this._setResponseViewerRef}
               // Send larger one because legacy responses have bytesContent === -1
               responseId={response._id}
               bytes={Math.max(response.bytesContent, response.bytesRead)}
@@ -315,7 +355,7 @@ class ResponsePane extends React.PureComponent<Props> {
           <TabPanel className="react-tabs__tab-panel">
             <ErrorBoundary key={response._id} errorClassName="font-error pad text-center">
               <ResponseTimelineViewer
-                timeline={response.timeline || []}
+                response={response}
                 editorLineWrapping={editorLineWrapping}
                 editorFontSize={editorFontSize}
                 editorIndentSize={editorIndentSize}

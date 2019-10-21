@@ -14,12 +14,20 @@ class SidebarRequestGroupRow extends PureComponent {
   constructor(props) {
     super(props);
     this.state = {
-      dragDirection: 0
+      dragDirection: 0,
     };
   }
 
   _setRequestGroupActionsDropdownRef(n) {
     this._requestGroupActionsDropdown = n;
+  }
+
+  _setExpandTagRef(n) {
+    this._expandTag = n;
+  }
+
+  getExpandTag() {
+    return this._expandTag;
   }
 
   _handleCollapse() {
@@ -54,7 +62,9 @@ class SidebarRequestGroupRow extends PureComponent {
       handleMoveRequestGroup,
       isDragging,
       isDraggingOver,
-      workspace
+      workspace,
+      hotKeyRegistry,
+      activeEnvironment,
     } = this.props;
 
     const { dragDirection } = this.state;
@@ -67,7 +77,7 @@ class SidebarRequestGroupRow extends PureComponent {
     const classes = classnames('sidebar__row', {
       'sidebar__row--dragging': isDragging,
       'sidebar__row--dragging-above': isDraggingOver && dragDirection > 0,
-      'sidebar__row--dragging-below': isDraggingOver && dragDirection < 0
+      'sidebar__row--dragging-below': isDraggingOver && dragDirection < 0,
     });
 
     // NOTE: We only want the button draggable, not the whole container (ie. no children)
@@ -75,18 +85,34 @@ class SidebarRequestGroupRow extends PureComponent {
       connectDropTarget(
         <button onClick={this._handleCollapse} onContextMenu={this._handleShowActions}>
           <div className="sidebar__clickable">
-            <i className={'sidebar__item__icon fa ' + folderIconClass} />
+            <i
+              className={classnames(
+                'sidebar__item__icon-right',
+                'fa',
+                'space-right',
+                folderIconClass,
+              )}
+            />
             <Highlight search={filter} text={requestGroup.name} />
+            <div
+              ref={this._setExpandTagRef}
+              className={classnames('sidebar__expand', {
+                'sidebar__expand-hint': isDraggingOver && isCollapsed,
+              })}>
+              <div className="tag tag--no-bg tag--small">
+                <span className="tag__inner">OPEN</span>
+              </div>
+            </div>
           </div>
-        </button>
-      )
+        </button>,
+      ),
     );
 
     return (
       <li key={requestGroup._id} className={classes}>
         <div
           className={classnames('sidebar__item sidebar__item--big', {
-            'sidebar__item--active': isActive
+            'sidebar__item--active': isActive,
           })}>
           {button}
           <div className="sidebar__actions">
@@ -98,6 +124,8 @@ class SidebarRequestGroupRow extends PureComponent {
               handleMoveRequestGroup={handleMoveRequestGroup}
               workspace={workspace}
               requestGroup={requestGroup}
+              hotKeyRegistry={hotKeyRegistry}
+              activeEnvironment={activeEnvironment}
               right
             />
           </div>
@@ -105,7 +133,7 @@ class SidebarRequestGroupRow extends PureComponent {
 
         <ul
           className={classnames('sidebar__list', {
-            'sidebar__list--collapsed': isCollapsed
+            'sidebar__list--collapsed': isCollapsed,
           })}>
           {!isCollapsed && children.length > 0 ? (
             children
@@ -115,6 +143,7 @@ class SidebarRequestGroupRow extends PureComponent {
               handleDuplicateRequest={misc.nullFn}
               handleGenerateCode={misc.nullFn}
               handleCopyAsCurl={misc.nullFn}
+              handleSetRequestPinned={misc.nullFn}
               moveDoc={moveDoc}
               isActive={false}
               request={null}
@@ -122,6 +151,8 @@ class SidebarRequestGroupRow extends PureComponent {
               workspace={workspace}
               requestCreate={handleCreateRequest}
               filter={filter}
+              hotKeyRegistry={hotKeyRegistry}
+              isPinned={false}
             />
           )}
         </ul>
@@ -146,6 +177,7 @@ SidebarRequestGroupRow.propTypes = {
   isCollapsed: PropTypes.bool.isRequired,
   workspace: PropTypes.object.isRequired,
   requestGroup: PropTypes.object.isRequired,
+  hotKeyRegistry: PropTypes.object.isRequired,
 
   // React DnD
   isDragging: PropTypes.bool,
@@ -154,7 +186,8 @@ SidebarRequestGroupRow.propTypes = {
   connectDropTarget: PropTypes.func,
 
   // Optional
-  children: PropTypes.node
+  children: PropTypes.node,
+  activeEnvironment: PropTypes.object,
 };
 
 /**
@@ -163,9 +196,9 @@ SidebarRequestGroupRow.propTypes = {
 const dragSource = {
   beginDrag(props) {
     return {
-      requestGroup: props.requestGroup
+      requestGroup: props.requestGroup,
     };
-  }
+  },
 };
 
 function isAbove(monitor, component) {
@@ -175,6 +208,18 @@ function isAbove(monitor, component) {
   const draggedTop = monitor.getSourceClientOffset().y;
 
   return hoveredTop > draggedTop;
+}
+
+function isOnExpandTag(monitor, component) {
+  const rect = component.getExpandTag().getBoundingClientRect();
+  const pointer = monitor.getClientOffset();
+
+  return (
+    rect.left <= pointer.x &&
+    pointer.x <= rect.right &&
+    rect.top <= pointer.y &&
+    pointer.y <= rect.bottom
+  );
 }
 
 const dragTarget = {
@@ -190,25 +235,28 @@ const dragTarget = {
     }
   },
   hover(props, monitor, component) {
-    if (isAbove(monitor, component)) {
-      component.decoratedComponentInstance.setDragDirection(1);
+    if (props.isCollapsed && isOnExpandTag(monitor, component)) {
+      component.props.handleSetRequestGroupCollapsed(props.requestGroup._id, false);
+      component.setDragDirection(0);
+    } else if (isAbove(monitor, component)) {
+      component.setDragDirection(1);
     } else {
-      component.decoratedComponentInstance.setDragDirection(-1);
+      component.setDragDirection(-1);
     }
-  }
+  },
 };
 
 function sourceCollect(connect, monitor) {
   return {
     connectDragSource: connect.dragSource(),
-    isDragging: monitor.isDragging()
+    isDragging: monitor.isDragging(),
   };
 }
 
 function targetCollect(connect, monitor) {
   return {
     connectDropTarget: connect.dropTarget(),
-    isDraggingOver: monitor.isOver()
+    isDraggingOver: monitor.isOver(),
   };
 }
 

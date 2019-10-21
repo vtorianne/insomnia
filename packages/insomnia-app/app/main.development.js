@@ -1,5 +1,5 @@
 // @flow
-import needsRestart from 'electron-squirrel-startup';
+import { checkIfRestartNeeded } from './main/squirrel-startup';
 import * as electron from 'electron';
 import * as errorHandling from './main/error-handling';
 import * as updates from './main/updates';
@@ -11,7 +11,7 @@ import type { ToastNotification } from './ui/components/toast';
 import type { Stats } from './models/stats';
 
 // Handle potential auto-update
-if (needsRestart) {
+if (checkIfRestartNeeded()) {
   process.exit(0);
 }
 
@@ -80,8 +80,19 @@ function _launchApp() {
   });
 
   // Called when second instance launched with args (Windows)
-  app.makeSingleInstance(args => {
-    args.length && window.send('run-command', args[0]);
+  const gotTheLock = app.requestSingleInstanceLock();
+
+  if (!gotTheLock) {
+    console.error('[app] Failed to get instance lock');
+    return;
+  }
+
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (window) {
+      if (window.isMinimized()) window.restore();
+      window.focus();
+    }
   });
 
   // Handle URLs when app already open
@@ -109,7 +120,7 @@ async function _trackStats() {
     lastLaunch: oldStats.currentLaunch,
     currentVersion: getAppVersion(),
     lastVersion: oldStats.currentVersion,
-    launches: oldStats.launches + 1
+    launches: oldStats.launches + 1,
   });
 
   // Update Stats Object
@@ -128,7 +139,7 @@ async function _trackStats() {
       url: `${CHANGELOG_BASE_URL}/${currentVersion}/`,
       cta: "See What's New",
       message: `Updated to ${currentVersion}`,
-      email: 'support@insomnia.rest'
+      email: 'support@insomnia.rest',
     };
 
     // Wait a bit before showing the user because the app just launched.

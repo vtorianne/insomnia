@@ -4,11 +4,12 @@ export const name = 'Folder Meta';
 export const type = 'RequestGroupMeta';
 export const prefix = 'fldm';
 export const canDuplicate = false;
+export const canSync = false;
 
 export function init() {
   return {
     parentId: null,
-    collapsed: false
+    collapsed: false,
   };
 }
 

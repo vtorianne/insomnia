@@ -1,9 +1,10 @@
 const SwaggerParser = require('swagger-parser');
+const utils = require('../utils');
 
 const SUPPORTED_SWAGGER_VERSION = '2.0';
 const MIMETYPE_JSON = 'application/json';
 const SUPPORTED_MIME_TYPES = [MIMETYPE_JSON];
-const WORKSPACE_ID = '__WORKSPACE_1__';
+const WORKSPACE_ID = '__WORKSPACE_ID__';
 
 let requestCount = 1;
 let requestGroupCount = 1;
@@ -17,9 +18,18 @@ module.exports.convert = async function(rawData) {
   requestGroupCount = 1;
 
   // Validate
-  const api = await parseDocument(rawData);
+  let api = await parseDocument(rawData);
   if (!api || api.swagger !== SUPPORTED_SWAGGER_VERSION) {
     return null;
+  }
+
+  // Await here so we catch any exceptions
+  try {
+    api = await SwaggerParser.validate(api);
+  } catch (err) {
+    // We already know it's a Swagger doc so we will try to import it anyway instead
+    // of bailing out here.
+    console.log('[swagger] Import file validation failed', err);
   }
 
   // Import
@@ -28,17 +38,17 @@ module.exports.convert = async function(rawData) {
     _id: WORKSPACE_ID,
     parentId: null,
     name: `${api.info.title} ${api.info.version}`,
-    description: api.info.description || ''
+    description: api.info.description || '',
   };
 
   const baseEnv = {
     _type: 'environment',
     _id: '__ENV_1__',
-    parentId: '__WORKSPACE_1__',
+    parentId: WORKSPACE_ID,
     name: 'Base environment',
     data: {
-      base_url: '{{ scheme }}://{{ host }}{{ base_path }}'
-    }
+      base_url: '{{ scheme }}://{{ host }}{{ base_path }}',
+    },
   };
 
   const swaggerEnv = {
@@ -49,8 +59,8 @@ module.exports.convert = async function(rawData) {
     data: {
       base_path: api.basePath || '',
       scheme: (api.schemes || ['http'])[0],
-      host: api.host || ''
-    }
+      host: api.host || '',
+    },
   };
 
   const endpoints = parseEndpoints(api);
@@ -67,23 +77,9 @@ module.exports.convert = async function(rawData) {
  */
 async function parseDocument(rawData) {
   try {
-    const api = unthrowableParseJson(rawData) || SwaggerParser.YAML.parse(rawData);
-    if (!api) {
-      return null;
-    }
-
-    // Await here so we catch any exceptions
-    return await SwaggerParser.validate(api);
+    return utils.unthrowableParseJson(rawData) || SwaggerParser.YAML.parse(rawData);
   } catch (err) {
     return null;
-  }
-
-  function unthrowableParseJson(rawData) {
-    try {
-      return JSON.parse(rawData);
-    } catch (err) {
-      return null;
-    }
   }
 }
 
@@ -108,7 +104,7 @@ function parseEndpoints(document) {
         .filter(method => method !== 'parameters')
         .map(method => Object.assign({}, schemasPerMethod[method], { path, method }));
     })
-    .reduce((flat, arr) => flat.concat(arr), []); //flat single array
+    .reduce((flat, arr) => flat.concat(arr), []); // flat single array
 
   const tags = document.tags || [];
   const folders = tags.map(tag => {
@@ -120,10 +116,11 @@ function parseEndpoints(document) {
   const requests = [];
   endpointsSchemas.map(endpointSchema => {
     let { tags } = endpointSchema;
-    if (!tags || tags.length == 0) tags = [''];
+    if (!tags || tags.length === 0) tags = [''];
     tags.forEach((tag, index) => {
-      let id =
-        endpointSchema.operationId + (index > 0 ? index : '') || `__REQUEST_${requestCount++}__`;
+      let id = endpointSchema.operationId
+        ? `${endpointSchema.operationId}${index > 0 ? index : ''}`
+        : `__REQUEST_${requestCount++}__`;
       let parentId = folderLookup[tag] || defaultParent;
       requests.push(importRequest(endpointSchema, globalMimeTypes, id, parentId));
     });
@@ -146,7 +143,7 @@ function importFolderItem(item, parentId) {
     _id: `__GRP_${requestGroupCount++}__`,
     _type: 'request_group',
     name: item.name || `Folder {requestGroupCount}`,
-    description: item.description || ''
+    description: item.description || '',
   };
 }
 
@@ -171,7 +168,7 @@ function importRequest(endpointSchema, globalMimeTypes, id, parentId) {
     url: '{{ base_url }}' + pathWithParamsAsVariables(endpointSchema.path),
     body: prepareBody(endpointSchema, globalMimeTypes),
     headers: prepareHeaders(endpointSchema),
-    parameters: prepareQueryParams(endpointSchema)
+    parameters: prepareQueryParams(endpointSchema),
   };
 }
 
@@ -234,7 +231,7 @@ function prepareBody(endpointSchema, globalMimeTypes) {
     const bodyParameter = parameters.find(isSendInBody);
     if (!bodyParameter) {
       return {
-        mimeType: supportedMimeType
+        mimeType: supportedMimeType,
       };
     }
 
@@ -242,13 +239,13 @@ function prepareBody(endpointSchema, globalMimeTypes) {
     const text = JSON.stringify(example, null, 2);
     return {
       mimeType: supportedMimeType,
-      text
+      text,
     };
   }
 
   if (mimeTypes && mimeTypes.length) {
     return {
-      mimeType: mimeTypes[0] || undefined
+      mimeType: mimeTypes[0] || undefined,
     };
   } else {
     return {};
@@ -267,7 +264,7 @@ function convertParameters(parameters) {
     return {
       name,
       disabled: required !== true,
-      value: `${generateParameterExample(parameter)}`
+      value: `${generateParameterExample(parameter)}`,
     };
   });
 }
@@ -296,9 +293,11 @@ function generateParameterExample(schema) {
       const example = {};
       const { properties } = schema;
 
-      Object.keys(properties).forEach(propertyName => {
-        example[propertyName] = generateParameterExample(properties[propertyName]);
-      });
+      if (properties) {
+        Object.keys(properties).forEach(propertyName => {
+          example[propertyName] = generateParameterExample(properties[propertyName]);
+        });
+      }
 
       return example;
     },
@@ -309,7 +308,7 @@ function generateParameterExample(schema) {
       } else {
         return [value];
       }
-    }
+    },
   };
 
   if (typeof schema === 'string') {
@@ -328,6 +327,11 @@ function generateParameterExample(schema) {
     }
 
     const factory = typeExamples[`${type}_${format}`] || typeExamples[type];
+
+    if (!factory) {
+      return null;
+    }
+
     return factory(schema);
   }
 }

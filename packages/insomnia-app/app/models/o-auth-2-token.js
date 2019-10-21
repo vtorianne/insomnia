@@ -15,7 +15,7 @@ type BaseOAuth2Token = {
   // Error handling
   error: string,
   errorDescription: string,
-  errorUri: string
+  errorUri: string,
 };
 
 export type OAuth2Token = BaseModel & BaseOAuth2Token;
@@ -24,6 +24,7 @@ export const name = 'OAuth 2.0 Token';
 export const type = 'OAuth2Token';
 export const prefix = 'oa2';
 export const canDuplicate = false;
+export const canSync = false;
 
 export function init(): BaseOAuth2Token {
   return {
@@ -38,7 +39,7 @@ export function init(): BaseOAuth2Token {
     // Error handling
     error: '',
     errorDescription: '',
-    errorUri: ''
+    errorUri: '',
   };
 }
 

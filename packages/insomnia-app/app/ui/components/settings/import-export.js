@@ -15,25 +15,25 @@ class ImportExport extends PureComponent {
       placeholder: 'https://website.com/insomnia-import.json',
       onComplete: uri => {
         this.props.handleImportUri(uri);
-      }
+      },
     });
   }
 
   render() {
-    const { handleImportFile, handleExportAll, handleExportWorkspace } = this.props;
+    const { handleImportFile, handleExportAll, handleShowExportRequestsModal } = this.props;
 
     return (
       <div>
         <p className="no-margin-top">
-          Import format will be automatically detected (<strong>
-            Insomnia, Postman v2, HAR, Curl, Swagger
-          </strong>)
+          Import format will be automatically detected (
+          <strong>Insomnia, Postman v2, HAR, Curl, Swagger, OpenAPI v3</strong>)
         </p>
         <p>
           Don't see your format here?{' '}
           <Link href="https://support.insomnia.rest/article/52-importing-and-exporting-data">
             Add Your Own
-          </Link>.
+          </Link>
+          .
         </p>
         <div className="pad-top">
           <Dropdown outline>
@@ -41,7 +41,7 @@ class ImportExport extends PureComponent {
               Export Data <i className="fa fa-caret-down" />
             </DropdownButton>
             <DropdownDivider>Choose Export Type</DropdownDivider>
-            <DropdownItem onClick={handleExportWorkspace}>
+            <DropdownItem onClick={handleShowExportRequestsModal}>
               <i className="fa fa-home" />
               Current Workspace
             </DropdownItem>
@@ -65,6 +65,10 @@ class ImportExport extends PureComponent {
               From URL
             </DropdownItem>
           </Dropdown>
+          &nbsp;&nbsp;
+          <Link href="https://insomnia.rest/create-run-button/" className="btn btn--compact" button>
+            Create Run Button
+          </Link>
         </div>
         <p className="italic faint">* Tip: You can also paste Curl commands into the URL bar</p>
       </div>
@@ -76,7 +80,7 @@ ImportExport.propTypes = {
   handleImportFile: PropTypes.func.isRequired,
   handleImportUri: PropTypes.func.isRequired,
   handleExportAll: PropTypes.func.isRequired,
-  handleExportWorkspace: PropTypes.func.isRequired
+  handleShowExportRequestsModal: PropTypes.func.isRequired,
 };
 
 export default ImportExport;

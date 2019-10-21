@@ -18,7 +18,7 @@ class SidebarRequestRow extends PureComponent {
     super(props);
     this.state = {
       dragDirection: 0,
-      isEditing: false
+      isEditing: false,
     };
   }
 
@@ -69,6 +69,7 @@ class SidebarRequestRow extends PureComponent {
     const {
       filter,
       handleDuplicateRequest,
+      handleSetRequestPinned,
       handleGenerateCode,
       handleCopyAsCurl,
       connectDragSource,
@@ -77,7 +78,10 @@ class SidebarRequestRow extends PureComponent {
       isDraggingOver,
       request,
       requestGroup,
-      isActive
+      isActive,
+      isPinned,
+      disableDragAndDrop,
+      hotKeyRegistry,
     } = this.props;
 
     const { dragDirection } = this.state;
@@ -87,7 +91,7 @@ class SidebarRequestRow extends PureComponent {
     const classes = classnames('sidebar__row', {
       'sidebar__row--dragging': isDragging,
       'sidebar__row--dragging-above': isDraggingOver && dragDirection > 0,
-      'sidebar__row--dragging-below': isDraggingOver && dragDirection < 0
+      'sidebar__row--dragging-below': isDraggingOver && dragDirection < 0,
     });
 
     if (!request) {
@@ -105,7 +109,7 @@ class SidebarRequestRow extends PureComponent {
         <li className={classes}>
           <div
             className={classnames('sidebar__item', 'sidebar__item--request', {
-              'sidebar__item--active': isActive
+              'sidebar__item--active': isActive,
             })}>
             <button
               className="wide"
@@ -119,7 +123,12 @@ class SidebarRequestRow extends PureComponent {
                   onEditStart={this._handleEditStart}
                   onSubmit={this._handleRequestUpdateName}
                   renderReadView={(value, props) => (
-                    <Highlight search={filter} text={value} {...props} />
+                    <Highlight
+                      search={filter}
+                      text={value}
+                      {...props}
+                      title={`${request.name}\n${props.title}`}
+                    />
                   )}
                 />
               </div>
@@ -129,19 +138,29 @@ class SidebarRequestRow extends PureComponent {
                 right
                 ref={this._setRequestActionsDropdownRef}
                 handleDuplicateRequest={handleDuplicateRequest}
+                handleSetRequestPinned={handleSetRequestPinned}
                 handleGenerateCode={handleGenerateCode}
                 handleCopyAsCurl={handleCopyAsCurl}
                 handleShowSettings={this._handleShowRequestSettings}
                 request={request}
+                isPinned={isPinned}
                 requestGroup={requestGroup}
+                hotKeyRegistry={hotKeyRegistry}
               />
             </div>
+            {isPinned && (
+              <div className="sidebar__item__icon-pin">
+                <i className="fa fa-thumb-tack" />
+              </div>
+            )}
           </div>
         </li>
       );
     }
 
-    if (!this.state.isEditing) {
+    if (disableDragAndDrop) {
+      return node;
+    } else if (!this.state.isEditing) {
       return connectDragSource(connectDropTarget(node));
     } else {
       return connectDropTarget(node);
@@ -152,6 +171,7 @@ class SidebarRequestRow extends PureComponent {
 SidebarRequestRow.propTypes = {
   // Functions
   handleActivateRequest: PropTypes.func.isRequired,
+  handleSetRequestPinned: PropTypes.func.isRequired,
   handleDuplicateRequest: PropTypes.func.isRequired,
   handleGenerateCode: PropTypes.func.isRequired,
   handleCopyAsCurl: PropTypes.func.isRequired,
@@ -161,6 +181,8 @@ SidebarRequestRow.propTypes = {
   // Other
   filter: PropTypes.string.isRequired,
   isActive: PropTypes.bool.isRequired,
+  isPinned: PropTypes.bool.isRequired,
+  hotKeyRegistry: PropTypes.object.isRequired,
 
   // React DnD
   isDragging: PropTypes.bool,
@@ -170,13 +192,14 @@ SidebarRequestRow.propTypes = {
 
   // Optional
   requestGroup: PropTypes.object,
-  request: PropTypes.object
+  request: PropTypes.object,
+  disableDragAndDrop: PropTypes.bool,
 };
 
 const dragSource = {
   beginDrag(props) {
     return { request: props.request };
-  }
+  },
 };
 
 function isAbove(monitor, component) {
@@ -203,24 +226,24 @@ const dragTarget = {
   },
   hover(props, monitor, component) {
     if (isAbove(monitor, component)) {
-      component.decoratedComponentInstance.setDragDirection(1);
+      component.setDragDirection(1);
     } else {
-      component.decoratedComponentInstance.setDragDirection(-1);
+      component.setDragDirection(-1);
     }
-  }
+  },
 };
 
 function sourceCollect(connect, monitor) {
   return {
     connectDragSource: connect.dragSource(),
-    isDragging: monitor.isDragging()
+    isDragging: monitor.isDragging(),
   };
 }
 
 function targetCollect(connect, monitor) {
   return {
     connectDropTarget: connect.dropTarget(),
-    isDraggingOver: monitor.isOver()
+    isDraggingOver: monitor.isOver(),
   };
 }
 

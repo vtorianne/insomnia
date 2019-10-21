@@ -1,7 +1,19 @@
 // @flow
 
+import type { PluginArgumentEnumOption } from './extensions';
+
 export type NunjucksParsedTagArg = {
-  type: 'string' | 'number' | 'boolean' | 'number' | 'variable' | 'expression',
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'number'
+    | 'variable'
+    | 'expression'
+    | 'enum'
+    | 'file'
+    | 'model',
+  encoding?: 'base64',
   value: string | number | boolean,
   defaultValue?: string | number | boolean,
   forceVariable?: boolean,
@@ -10,13 +22,20 @@ export type NunjucksParsedTagArg = {
   displayName?: string,
   quotedBy?: '"' | "'",
   validate?: (value: any) => string,
-  hide?: (Array<NunjucksParsedTagArg>) => boolean
+  hide?: (Array<NunjucksParsedTagArg>) => boolean,
+  model?: string,
+  options?: Array<PluginArgumentEnumOption>,
+  itemTypes?: Array<string>,
+  extensions?: Array<string>,
 };
 
 export type NunjucksParsedTag = {
   name: string,
   args: Array<NunjucksParsedTagArg>,
-  rawValue?: string
+  rawValue?: string,
+  displayName?: string,
+  description?: string,
+  disablePreview?: (Array<NunjucksParsedTagArg>) => boolean,
 };
 
 /**
@@ -172,7 +191,8 @@ export function getDefaultFill(name: string, args: Array<NunjucksParsedTagArg>):
     switch (argDefinition.type) {
       case 'enum':
         const { defaultValue, options } = argDefinition;
-        const value = defaultValue !== undefined ? defaultValue : options[0].value;
+        const fallback = options && options.length ? options[0].value : '';
+        const value = defaultValue !== undefined ? String(defaultValue) : String(fallback);
         return `'${value}'`;
       case 'number':
         return `${parseFloat(argDefinition.defaultValue) || 0}`;
@@ -188,4 +208,30 @@ export function getDefaultFill(name: string, args: Array<NunjucksParsedTagArg>):
   });
 
   return `${name} ${stringArgs.join(', ')}`;
+}
+
+export function encodeEncoding(value: string, encoding: 'base64'): string {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  if (encoding === 'base64') {
+    const encodedValue = Buffer.from(value, 'utf8').toString('base64');
+    return `b64::${encodedValue}::46b`;
+  }
+
+  return value;
+}
+
+export function decodeEncoding(value: string): string {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const results = value.match(/^b64::(.+)::46b$/);
+  if (results) {
+    return Buffer.from(results[1], 'base64').toString('utf8');
+  }
+
+  return value;
 }
