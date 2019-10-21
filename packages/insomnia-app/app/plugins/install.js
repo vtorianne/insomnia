@@ -32,7 +32,7 @@ export default async function(lookupName: string): Promise<void> {
 
       // Move entire module to plugins folder
       fsx.moveSync(path.join(tmpDir, moduleName), pluginDir, {
-        overwrite: true
+        overwrite: true,
       });
 
       // Move each dependency into node_modules folder
@@ -63,10 +63,10 @@ async function _isInsomniaPlugin(lookupName: string): Promise<Object> {
       escape(process.execPath),
       [
         '--no-deprecation', // Because Yarn still uses `new Buffer()`
-        _getYarnPath(),
+        escape(_getYarnPath()),
         'info',
         lookupName,
-        '--json'
+        '--json',
       ],
       {
         timeout: 5 * 60 * 1000,
@@ -74,25 +74,27 @@ async function _isInsomniaPlugin(lookupName: string): Promise<Object> {
         shell: true,
         env: {
           NODE_ENV: 'production',
-          ELECTRON_RUN_AS_NODE: 'true'
-        }
+          ELECTRON_RUN_AS_NODE: 'true',
+        },
       },
       (err, stdout, stderr) => {
-        if (err) {
-          reject(new Error(`${lookupName} npm error: ${err.message}`));
-          return;
-        }
-
         if (stderr) {
-          reject(new Error(`Yarn error ${stderr.toString('utf8')}`));
+          reject(new Error(`Yarn error ${stderr.toString()}`));
           return;
         }
 
         let yarnOutput;
         try {
-          yarnOutput = JSON.parse(stdout.toString('utf8'));
-        } catch (err) {
-          reject(new Error(`Yarn response not JSON: ${err.message}`));
+          yarnOutput = JSON.parse(stdout.toString());
+        } catch (ex) {
+          // Output is not JSON. Check if yarn/electron terminated with non-zero exit code.
+          // In certain environments electron can exit with error even if output is OK.
+          // Parsing is attemted before checking exit code as workaround for false errors.
+          if (err) {
+            reject(new Error(`${lookupName} npm error: ${err.message}`));
+          } else {
+            reject(new Error(`Yarn response not JSON: ${ex.message}`));
+          }
           return;
         }
 
@@ -110,10 +112,10 @@ async function _isInsomniaPlugin(lookupName: string): Promise<Object> {
           version: data.version,
           dist: {
             shasum: data.dist.shasum,
-            tarball: data.dist.tarball
-          }
+            tarball: data.dist.tarball,
+          },
         });
-      }
+      },
     );
   });
 }
@@ -127,16 +129,16 @@ async function _installPluginToTmpDir(lookupName: string): Promise<{ tmpDir: str
       escape(process.execPath),
       [
         '--no-deprecation', // Because Yarn still uses `new Buffer()`
-        _getYarnPath(),
+        escape(_getYarnPath()),
         'add',
         lookupName,
         '--modules-folder',
-        tmpDir,
+        escape(tmpDir),
         '--cwd',
-        tmpDir,
+        escape(tmpDir),
         '--no-lockfile',
         '--production',
-        '--no-progress'
+        '--no-progress',
       ],
       {
         timeout: 5 * 60 * 1000,
@@ -145,22 +147,25 @@ async function _installPluginToTmpDir(lookupName: string): Promise<{ tmpDir: str
         shell: true, // Some package installs require a shell
         env: {
           NODE_ENV: 'production',
-          ELECTRON_RUN_AS_NODE: 'true'
-        }
+          ELECTRON_RUN_AS_NODE: 'true',
+        },
       },
       (err, stdout, stderr) => {
-        if (err) {
+        // Check yarn/electron process exit code.
+        // In certain environments electron can exit with error even if the command was perfomed sucesfully.
+        // Checking for sucess message in output is a workaround for false errors.
+        if (err && !stdout.toString().includes('success')) {
           reject(new Error(`${lookupName} install error: ${err.message}`));
           return;
         }
 
         if (stderr) {
-          reject(new Error(`Yarn error ${stderr.toString('utf8')}`));
+          reject(new Error(`Yarn error ${stderr.toString()}`));
           return;
         }
 
         resolve({ tmpDir });
-      }
+      },
     );
   });
 }

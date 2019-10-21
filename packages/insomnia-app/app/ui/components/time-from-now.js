@@ -4,11 +4,14 @@ import autobind from 'autobind-decorator';
 import moment from 'moment';
 
 type Props = {
-  timestamp: number
+  timestamp: number | Date | string,
+  intervalSeconds?: number,
+  className?: string,
+  capitalize?: boolean,
 };
 
 type State = {
-  text: string
+  text: string,
 };
 
 @autobind
@@ -19,17 +22,33 @@ class TimeFromNow extends React.PureComponent<Props, State> {
     super(props);
     this._interval = null;
     this.state = {
-      text: ''
+      text: '',
     };
   }
 
   _update() {
-    const { timestamp } = this.props;
-    this.setState({ text: moment(timestamp).fromNow() });
+    const { timestamp, capitalize } = this.props;
+
+    let text = moment(timestamp).fromNow();
+
+    // Shorten default case
+    if (text === 'a few seconds ago') {
+      text = 'just now';
+    }
+
+    // Capitalize if needed
+    if (capitalize) {
+      text = text.replace(/\w\S*/g, function(txt) {
+        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+      });
+    }
+
+    this.setState({ text });
   }
 
   componentDidMount() {
-    this._interval = setInterval(this._update, 5000);
+    const intervalSeconds = this.props.intervalSeconds || 5;
+    this._interval = setInterval(this._update, intervalSeconds * 1000);
     this._update();
   }
 
@@ -38,7 +57,14 @@ class TimeFromNow extends React.PureComponent<Props, State> {
   }
 
   render() {
-    return <span title={moment(this.props.timestamp).toString()}>{this.state.text}</span>;
+    const { className, timestamp } = this.props;
+    const { text } = this.state;
+
+    return (
+      <span title={moment(timestamp).toString()} className={className}>
+        {text}
+      </span>
+    );
   }
 }
 

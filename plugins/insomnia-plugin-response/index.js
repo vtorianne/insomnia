@@ -15,27 +15,28 @@ module.exports.templateTags = [
           {
             displayName: 'Body Attribute',
             description: 'value of response body',
-            value: 'body'
+            value: 'body',
           },
           {
             displayName: 'Raw Body',
             description: 'entire response body',
-            value: 'raw'
+            value: 'raw',
           },
           {
             displayName: 'Header',
             description: 'value of response header',
-            value: 'header'
-          }
-        ]
+            value: 'header',
+          },
+        ],
       },
       {
         displayName: 'Request',
         type: 'model',
-        model: 'Request'
+        model: 'Request',
       },
       {
         type: 'string',
+        encoding: 'base64',
         hide: args => args[0].value === 'raw',
         displayName: args => {
           switch (args[0].value) {
@@ -46,12 +47,35 @@ module.exports.templateTags = [
             default:
               return 'Filter';
           }
-        }
-      }
+        },
+      },
+      {
+        displayName: 'Trigger Behavior',
+        help: 'Configure when to resend the dependent request',
+        type: 'enum',
+        options: [
+          {
+            displayName: 'Never',
+            description: 'never resend request',
+            value: 'never',
+          },
+          {
+            displayName: 'No History',
+            description: 'resend when no responses present',
+            value: 'no-history',
+          },
+          {
+            displayName: 'Always',
+            description: 'resend request when needed',
+            value: 'always',
+          },
+        ],
+      },
     ],
 
-    async run(context, field, id, filter) {
+    async run(context, field, id, filter, resendBehavior) {
       filter = filter || '';
+      resendBehavior = (resendBehavior || 'never').toLowerCase();
 
       if (!['body', 'header', 'raw'].includes(field)) {
         throw new Error(`Invalid response field ${field}`);
@@ -66,13 +90,45 @@ module.exports.templateTags = [
         throw new Error(`Could not find request ${id}`);
       }
 
-      const response = await context.util.models.response.getLatestForRequestId(id);
+      let response = await context.util.models.response.getLatestForRequestId(id);
+
+      let shouldResend = false;
+      if (context.context.getExtraInfo('fromResponseTag')) {
+        shouldResend = false;
+      } else if (resendBehavior === 'never') {
+        shouldResend = false;
+      } else if (resendBehavior === 'no-history') {
+        shouldResend = !response;
+      } else if (resendBehavior === 'always') {
+        shouldResend = true;
+      }
+
+      // Make sure we only send the request once per render so we don't have infinite recursion
+      const fromResponseTag = context.context.getExtraInfo('fromResponseTag');
+      if (fromResponseTag) {
+        console.log('[response tag] Preventing recursive render');
+        shouldResend = false;
+      }
+
+      if (shouldResend && context.renderPurpose === 'send') {
+        console.log('[response tag] Resending dependency');
+        response = await context.network.sendRequest(request, [
+          { name: 'fromResponseTag', value: true },
+        ]);
+      }
 
       if (!response) {
+        console.log('[response tag] No response found');
         throw new Error('No responses for request');
       }
 
+      if (response.error) {
+        console.log('[response tag] Response error ' + response.error);
+        throw new Error('Failed to send dependent request ' + response.error);
+      }
+
       if (!response.statusCode) {
+        console.log('[response tag] Invalid status code ' + response.statusCode);
         throw new Error('No successful responses for request');
       }
 
@@ -118,8 +174,8 @@ module.exports.templateTags = [
       } else {
         throw new Error(`Unknown field ${field}`);
       }
-    }
-  }
+    },
+  },
 ];
 
 function matchJSONPath(bodyStr, query) {

@@ -11,12 +11,12 @@ const ESCAPE_REGEX_MATCH = /[-[\]/{}()*+?.\\^$|]/g;
 
 type Header = {
   name: string,
-  value: string
+  value: string,
 };
 
 type Parameter = {
   name: string,
-  value: string
+  value: string,
 };
 
 export function filterParameters<T: Parameter>(parameters: Array<T>, name: string): Array<T> {
@@ -194,7 +194,11 @@ export function compressObject(obj: any): string {
   return compressed.toString('base64');
 }
 
-export function decompressObject(input: string): any {
+export function decompressObject(input: string | null): any {
+  if (typeof input !== 'string') {
+    return null;
+  }
+
   const jsonBuffer = zlib.gunzipSync(Buffer.from(input, 'base64'));
   return JSON.parse(jsonBuffer.toString('utf8'));
 }
@@ -233,7 +237,7 @@ export function escapeRegex(str: string): string {
 export function fuzzyMatch(
   searchString: string,
   text: string,
-  options: { splitSpace?: boolean, loose?: boolean } = {}
+  options: { splitSpace?: boolean, loose?: boolean } = {},
 ): null | { score: number, indexes: Array<number> } {
   return fuzzyMatchAll(searchString, [text], options);
 }
@@ -241,7 +245,7 @@ export function fuzzyMatch(
 export function fuzzyMatchAll(
   searchString: string,
   allText: Array<string>,
-  options: { splitSpace?: boolean, loose?: boolean } = {}
+  options: { splitSpace?: boolean, loose?: boolean } = {},
 ): null | { score: number, indexes: Array<number> } {
   if (!searchString || !searchString.trim()) {
     return null;
@@ -338,4 +342,13 @@ export async function waitForStreamToFinish(s: Readable | Writable): Promise<voi
 export function getDataDirectory(): string {
   const { app } = electron.remote || electron;
   return process.env.INSOMNIA_DATA_PATH || app.getPath('userData');
+}
+
+export function chunkArray<T>(arr: Array<T>, chunkSize: number): Array<Array<T>> {
+  const chunks = [];
+  for (let i = 0, j = arr.length; i < j; i += chunkSize) {
+    chunks.push(arr.slice(i, i + chunkSize));
+  }
+
+  return chunks;
 }

@@ -1,4 +1,5 @@
 // @flow
+import * as crypto from 'crypto';
 import * as db from '../common/database';
 import type { BaseModel } from './index';
 import type { Workspace } from './workspace';
@@ -7,15 +8,17 @@ export const name = 'Environment';
 export const type = 'Environment';
 export const prefix = 'env';
 export const canDuplicate = true;
+export const canSync = true;
 
 type BaseEnvironment = {
   name: string,
   data: Object,
+  dataPropertyOrder: Object | null,
   color: string | null,
   metaSortKey: number,
 
   // For sync control
-  isPrivate: boolean
+  isPrivate: boolean,
 };
 
 export type Environment = BaseModel & BaseEnvironment;
@@ -24,9 +27,10 @@ export function init() {
   return {
     name: 'New Environment',
     data: {},
+    dataPropertyOrder: null,
     color: null,
     isPrivate: false,
-    metaSortKey: Date.now()
+    metaSortKey: Date.now(),
   };
 }
 
@@ -56,7 +60,14 @@ export async function getOrCreateForWorkspaceId(workspaceId: string): Promise<En
   if (!environments.length) {
     return create({
       parentId: workspaceId,
-      name: 'Base Environment'
+      name: 'Base Environment',
+
+      // Deterministic base env ID. It helps reduce sync complexity since we won't have to
+      // de-duplicate environments.
+      _id: `${prefix}_${crypto
+        .createHash('sha1')
+        .update(workspaceId)
+        .digest('hex')}`,
     });
   }
 
@@ -69,6 +80,20 @@ export async function getOrCreateForWorkspace(workspace: Workspace): Promise<Env
 
 export function getById(id: string): Promise<Environment | null> {
   return db.get(type, id);
+}
+
+export async function duplicate(environment: Environment): Promise<Environment> {
+  const name = `${environment.name} (Copy)`;
+
+  // Get sort key of next environment
+  const q = { metaSortKey: { $gt: environment.metaSortKey } };
+  const [nextEnvironment] = await db.find(type, q, { metaSortKey: 1 });
+  const nextSortKey = nextEnvironment ? nextEnvironment.metaSortKey : environment.metaSortKey + 100;
+
+  // Calculate new sort key
+  const metaSortKey = (environment.metaSortKey + nextSortKey) / 2;
+
+  return db.duplicate(environment, { name, metaSortKey });
 }
 
 export function remove(environment: Environment): Promise<void> {

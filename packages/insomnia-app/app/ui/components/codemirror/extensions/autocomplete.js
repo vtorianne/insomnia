@@ -1,5 +1,6 @@
 import CodeMirror from 'codemirror';
 import 'codemirror/addon/mode/overlay';
+import * as models from '../../../../models';
 import { getDefaultFill } from '../../../../templating/utils';
 import { escapeHTML, escapeRegex } from '../../../../common/misc';
 
@@ -11,7 +12,6 @@ const COMPLETE_AFTER_WORD = /[\w.\][-]+/;
 const COMPLETE_AFTER_CURLIES = /[^{]*{[{%]\s*/;
 const COMPLETION_CLOSE_KEYS = /[}|-]/;
 const MAX_HINT_LOOK_BACK = 100;
-const HINT_DELAY_MILLIS = 700;
 const TYPE_VARIABLE = 'variable';
 const TYPE_TAG = 'tag';
 const TYPE_CONSTANT = 'constant';
@@ -22,7 +22,7 @@ const MAX_TAGS = -1;
 const ICONS = {
   [TYPE_CONSTANT]: { char: '&#x1d484;', title: 'Constant' },
   [TYPE_VARIABLE]: { char: '&#x1d465;', title: 'Environment Variable' },
-  [TYPE_TAG]: { char: '&fnof;', title: 'Generator Tag' }
+  [TYPE_TAG]: { char: '&fnof;', title: 'Generator Tag' },
 };
 
 CodeMirror.defineExtension('isHintDropdownActive', function() {
@@ -85,8 +85,8 @@ CodeMirror.defineOption('environmentAutocomplete', null, (cm, options) => {
           // Override default behavior and don't select hint on Tab
           widget.close();
           return CodeMirror.Pass;
-        }
-      }
+        },
+      },
 
       // Good for debugging
       // ,closeOnUnfocus: false
@@ -113,7 +113,7 @@ CodeMirror.defineOption('environmentAutocomplete', null, (cm, options) => {
         const range = cm.getRange(pos, cur);
         return range.match(COMPLETE_AFTER_CURLIES);
       },
-      true
+      true,
     );
 
     return CodeMirror.Pass;
@@ -126,7 +126,7 @@ CodeMirror.defineOption('environmentAutocomplete', null, (cm, options) => {
 
   let keydownDebounce = null;
 
-  cm.on('keydown', (cm, e) => {
+  cm.on('keydown', async (cm, e) => {
     // Close autocomplete on Escape if it's open
     if (cm.isHintDropdownActive() && e.key === 'Escape') {
       if (!cm.state.completionActive) {
@@ -146,9 +146,14 @@ CodeMirror.defineOption('environmentAutocomplete', null, (cm, options) => {
     }
 
     clearTimeout(keydownDebounce);
-    keydownDebounce = setTimeout(() => {
-      completeIfInVariableName(cm);
-    }, HINT_DELAY_MILLIS);
+
+    const { autocompleteDelay } = await models.settings.getOrCreate();
+
+    if (autocompleteDelay > 0) {
+      keydownDebounce = setTimeout(() => {
+        completeIfInVariableName(cm);
+      }, autocompleteDelay);
+    }
   });
 
   // Clear timeout if we already closed the completion
@@ -163,7 +168,7 @@ CodeMirror.defineOption('environmentAutocomplete', null, (cm, options) => {
   cm.addKeyMap({
     name: 'autocomplete-keymap',
     'Ctrl-Space': completeForce, // Force autocomplete on hotkey
-    "' '": completeIfAfterTagOrVarOpen
+    "' '": completeIfAfterTagOrVarOpen,
   });
 });
 
@@ -215,10 +220,10 @@ function hint(cm, options) {
   // Match variables
   if (allowMatchingVariables) {
     matchSegments(variablesToMatch, nameSegment, TYPE_VARIABLE, MAX_VARIABLES).forEach(m =>
-      lowPriorityMatches.push(m)
+      lowPriorityMatches.push(m),
     );
     matchSegments(variablesToMatch, nameSegmentLong, TYPE_VARIABLE, MAX_VARIABLES).forEach(m =>
-      highPriorityMatches.push(m)
+      highPriorityMatches.push(m),
     );
   }
 
@@ -236,7 +241,7 @@ function hint(cm, options) {
       if (token.type === 'variable') {
         // We're inside a JSON key
         matchSegments(constantsToMatch, segment, TYPE_CONSTANT, MAX_CONSTANTS).forEach(m =>
-          highPriorityMatches.push(m)
+          highPriorityMatches.push(m),
         );
       } else if (
         token.type === 'invalidchar' ||
@@ -245,13 +250,13 @@ function hint(cm, options) {
       ) {
         // We're outside of a JSON key
         matchSegments(constantsToMatch, segment, TYPE_CONSTANT, MAX_CONSTANTS).forEach(m =>
-          highPriorityMatches.push({ ...m, text: '"' + m.text + '": ' })
+          highPriorityMatches.push({ ...m, text: '"' + m.text + '": ' }),
         );
       }
     } else {
       // Otherwise match full segments
       matchSegments(constantsToMatch, nameSegmentFull, TYPE_CONSTANT, MAX_CONSTANTS).forEach(m =>
-        highPriorityMatches.push(m)
+        highPriorityMatches.push(m),
       );
     }
   }
@@ -259,10 +264,10 @@ function hint(cm, options) {
   // Match tags
   if (allowMatchingTags) {
     matchSegments(tagsToMatch, nameSegment, TYPE_TAG, MAX_TAGS).forEach(m =>
-      lowPriorityMatches.push(m)
+      lowPriorityMatches.push(m),
     );
     matchSegments(tagsToMatch, nameSegmentLong, TYPE_TAG, MAX_TAGS).forEach(m =>
-      highPriorityMatches.push(m)
+      highPriorityMatches.push(m),
     );
   }
 
@@ -273,13 +278,13 @@ function hint(cm, options) {
 
   const uniqueMatches = matches.reduce(
     (arr, v) => (arr.find(a => a.text === v.text) ? arr : [...arr, v]),
-    [] // Default value
+    [], // Default value
   );
 
   return {
     list: uniqueMatches,
     from: CodeMirror.Pos(cur.line, cur.ch - segment.length),
-    to: CodeMirror.Pos(cur.line, cur.ch)
+    to: CodeMirror.Pos(cur.line, cur.ch),
   };
 }
 
@@ -372,7 +377,7 @@ function matchSegments(listOfThings, segment, type, limit = -1) {
       text: defaultFill,
       displayText: displayName,
       render: renderHintMatch,
-      hint: replaceHintMatch
+      hint: replaceHintMatch,
     });
   }
 
@@ -409,15 +414,14 @@ function renderHintMatch(li, self, data) {
   const markedName = replaceWithSurround(displayText, segment, '<strong>', '</strong>');
 
   const { char, title } = ICONS[data.type];
+  const safeValue = escapeHTML(data.displayValue);
 
-  let html = `
+  li.className += ` fancy-hint type--${data.type}`;
+  li.innerHTML = `
     <label class="label" title="${title}">${char}</label>
     <div class="name">${markedName}</div>
-    <div class="value" title=${data.displayValue}>
-      ${escapeHTML(data.displayValue || '')}
+    <div class="value" title=${safeValue}>
+      ${safeValue}
     </div>
   `;
-
-  li.innerHTML = html;
-  li.className += ` fancy-hint type--${data.type}`;
 }

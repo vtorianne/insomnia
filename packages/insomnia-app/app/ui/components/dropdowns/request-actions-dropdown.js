@@ -7,10 +7,11 @@ import {
   DropdownButton,
   DropdownDivider,
   DropdownHint,
-  DropdownItem
+  DropdownItem,
 } from '../base/dropdown/index';
 import * as models from '../../../models';
-import * as hotkeys from '../../../common/hotkeys';
+import { hotKeyRefs } from '../../../common/hotkeys';
+import * as misc from '../../../common/misc';
 
 @autobind
 class RequestActionsDropdown extends PureComponent {
@@ -31,6 +32,14 @@ class RequestActionsDropdown extends PureComponent {
     this.props.handleCopyAsCurl(this.props.request);
   }
 
+  _canPin() {
+    return this.props.handleSetRequestPinned !== misc.nullFn;
+  }
+
+  _handleSetRequestPinned() {
+    this.props.handleSetRequestPinned(this.props.request, !this.props.isPinned);
+  }
+
   _handleRemove() {
     const { request } = this.props;
     models.request.remove(request);
@@ -44,6 +53,7 @@ class RequestActionsDropdown extends PureComponent {
     const {
       request, // eslint-disable-line no-unused-vars
       handleShowSettings,
+      hotKeyRegistry,
       ...other
     } = this.props;
 
@@ -52,26 +62,38 @@ class RequestActionsDropdown extends PureComponent {
         <DropdownButton>
           <i className="fa fa-caret-down" />
         </DropdownButton>
+
         <DropdownItem onClick={this._handleDuplicate}>
           <i className="fa fa-copy" /> Duplicate
-          <DropdownHint hotkey={hotkeys.DUPLICATE_REQUEST} />
+          <DropdownHint keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_SHOW_DUPLICATE.id]} />
         </DropdownItem>
+
         <DropdownItem onClick={this._handleGenerateCode}>
           <i className="fa fa-code" /> Generate Code
-          <DropdownHint hotkey={hotkeys.GENERATE_CODE} />
+          <DropdownHint
+            keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_SHOW_GENERATE_CODE_EDITOR.id]}
+          />
         </DropdownItem>
+
+        <DropdownItem onClick={this._handleSetRequestPinned}>
+          <i className="fa fa-thumb-tack" /> {this.props.isPinned ? 'Unpin' : 'Pin'}
+          <DropdownHint keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_TOGGLE_PIN.id]} />
+        </DropdownItem>
+
         <DropdownItem onClick={this._handleCopyAsCurl}>
           <i className="fa fa-copy" /> Copy as Curl
         </DropdownItem>
+
         <DropdownItem buttonClass={PromptButton} onClick={this._handleRemove} addIcon>
           <i className="fa fa-trash-o" /> Delete
+          <DropdownHint keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_SHOW_DELETE.id]} />
         </DropdownItem>
 
         <DropdownDivider />
 
         <DropdownItem onClick={handleShowSettings}>
           <i className="fa fa-wrench" /> Settings
-          <DropdownHint hotkey={hotkeys.SHOW_REQUEST_SETTINGS} />
+          <DropdownHint keyBindings={hotKeyRegistry[hotKeyRefs.REQUEST_SHOW_SETTINGS.id]} />
         </DropdownItem>
       </Dropdown>
     );
@@ -83,7 +105,10 @@ RequestActionsDropdown.propTypes = {
   handleGenerateCode: PropTypes.func.isRequired,
   handleCopyAsCurl: PropTypes.func.isRequired,
   handleShowSettings: PropTypes.func.isRequired,
-  request: PropTypes.object.isRequired
+  isPinned: PropTypes.bool.isRequired,
+  request: PropTypes.object.isRequired,
+  hotKeyRegistry: PropTypes.object.isRequired,
+  handleSetRequestPinned: PropTypes.func.isRequired,
 };
 
 export default RequestActionsDropdown;

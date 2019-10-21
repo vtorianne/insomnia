@@ -5,10 +5,11 @@ import autobind from 'autobind-decorator';
 import classnames from 'classnames';
 import GravatarImg from './gravatar-img';
 import Link from './base/link';
-import * as fetch from '../../common/fetch';
 import * as models from '../../models/index';
 import * as constants from '../../common/constants';
 import * as db from '../../common/database';
+import * as session from '../../account/session';
+import * as fetch from '../../account/fetch';
 
 const LOCALSTORAGE_KEY = 'insomnia::notifications::seen';
 
@@ -17,14 +18,14 @@ export type ToastNotification = {
   url: string,
   cta: string,
   message: string,
-  email: string
+  email: string,
 };
 
 type Props = {};
 
 type State = {
   notification: ToastNotification | null,
-  visible: boolean
+  visible: boolean,
 };
 
 @autobind
@@ -35,7 +36,7 @@ class Toast extends React.PureComponent<Props, State> {
     super(props);
     this.state = {
       notification: null,
-      visible: false
+      visible: false,
     };
   }
 
@@ -79,6 +80,7 @@ class Toast extends React.PureComponent<Props, State> {
         firstLaunch: stats.created,
         launches: stats.launches,
         platform: constants.getAppPlatform(),
+        app: constants.getAppId(),
         version: constants.getAppVersion(),
         requests: await db.count(models.request.type),
         requestGroups: await db.count(models.requestGroup.type),
@@ -87,10 +89,10 @@ class Toast extends React.PureComponent<Props, State> {
         updatesNotSupported: constants.isLinux(),
         autoUpdatesDisabled: !settings.updateAutomatically,
         disableUpdateNotification: settings.disableUpdateNotification,
-        updateChannel: !settings.updateChannel
+        updateChannel: !settings.updateChannel,
       };
 
-      notification = await fetch.post(`/notification`, data);
+      notification = await fetch.post(`/notification`, data, session.getCurrentSessionId());
     } catch (err) {
       console.warn('[toast] Failed to fetch user notifications', err);
     }
@@ -168,7 +170,7 @@ class Toast extends React.PureComponent<Props, State> {
     return (
       <div
         className={classnames('toast theme--dialog', {
-          'toast--show': visible
+          'toast--show': visible,
         })}>
         <div className="toast__image">
           <GravatarImg email={notification.email || 'gschier1990@gmail.com'} size={100} />

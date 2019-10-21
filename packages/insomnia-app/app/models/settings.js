@@ -1,7 +1,9 @@
 // @flow
+import * as packageJson from '../../package.json';
 import type { BaseModel } from './index';
 import * as db from '../common/database';
 import { UPDATE_CHANNEL_STABLE } from '../common/constants';
+import * as hotkeys from '../common/hotkeys';
 
 type BaseSettings = {
   showPasswords: boolean,
@@ -22,6 +24,7 @@ type BaseSettings = {
   autoHideMenuBar: boolean,
   theme: string,
   maxRedirects: number,
+  maxHistoryResponses: number,
   pluginPath: string,
   nunjucksPowerUserMode: boolean,
   deviceId: string | null,
@@ -29,10 +32,16 @@ type BaseSettings = {
   updateAutomatically: boolean,
   disableUpdateNotification: boolean,
   environmentHighlightColorStyle: string,
+  autocompleteDelay: number,
   fontMonospace: string | null,
   fontInterface: string | null,
   fontSize: number,
-  fontVariantLigatures: boolean
+  fontVariantLigatures: boolean,
+  maxTimelineDataSizeKB: number,
+
+  // Feature flags
+  enableSyncBeta: boolean,
+  hotKeyRegistry: hotkeys.HotKeyRegistry,
 };
 
 export type Settings = BaseModel & BaseSettings;
@@ -41,6 +50,7 @@ export const name = 'Settings';
 export const type = 'Settings';
 export const prefix = 'set';
 export const canDuplicate = false;
+export const canSync = false;
 
 export function init(): BaseSettings {
   return {
@@ -56,12 +66,13 @@ export function init(): BaseSettings {
     httpsProxy: '',
     noProxy: '',
     maxRedirects: -1,
+    maxHistoryResponses: 20,
     proxyEnabled: false,
     timeout: 0,
     validateSSL: true,
     forceVerticalLayout: false,
     autoHideMenuBar: false,
-    theme: 'default',
+    theme: packageJson.app.theme,
     pluginPath: '',
     nunjucksPowerUserMode: false,
     deviceId: null,
@@ -69,14 +80,19 @@ export function init(): BaseSettings {
     updateAutomatically: true,
     disableUpdateNotification: false,
     environmentHighlightColorStyle: 'sidebar-indicator',
+    autocompleteDelay: 1200,
     fontMonospace: null,
     fontInterface: null,
     fontSize: 13,
-    fontVariantLigatures: false
+    fontVariantLigatures: false,
+    maxTimelineDataSizeKB: 10,
+    enableSyncBeta: false,
+    hotKeyRegistry: hotkeys.newDefaultRegistry(),
   };
 }
 
 export function migrate(doc: Settings): Settings {
+  doc = migrateEnsureHotKeys(doc);
   return doc;
 }
 
@@ -104,4 +120,15 @@ export async function getOrCreate(patch: Object = {}): Promise<Settings> {
   } else {
     return results[0];
   }
+}
+
+/**
+ * Ensure map is updated when new hotkeys are added
+ */
+function migrateEnsureHotKeys(settings: Settings): Settings {
+  settings.hotKeyRegistry = {
+    ...hotkeys.newDefaultRegistry(),
+    ...settings.hotKeyRegistry,
+  };
+  return settings;
 }

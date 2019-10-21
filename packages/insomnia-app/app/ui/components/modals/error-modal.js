@@ -14,7 +14,7 @@ class ErrorModal extends PureComponent {
       title: '',
       error: null,
       message: '',
-      addCancel: false
+      addCancel: false,
     };
   }
 
@@ -52,7 +52,7 @@ class ErrorModal extends PureComponent {
           {message ? <div className="notice error">{message}</div> : null}
           {error && (
             <pre className="pad-top-sm force-wrap selectable">
-              <code>{error.stack}</code>
+              <code>{error.stack || error}</code>
             </pre>
           )}
         </ModalBody>

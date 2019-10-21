@@ -13,11 +13,11 @@ export default async function(
   clientId: string,
   clientSecret: string,
   refreshToken: string,
-  scope: string
+  scope: string,
 ): Promise<Object> {
   const params = [
     { name: c.P_GRANT_TYPE, value: c.GRANT_TYPE_REFRESH },
-    { name: c.P_REFRESH_TOKEN, value: refreshToken }
+    { name: c.P_REFRESH_TOKEN, value: refreshToken },
   ];
 
   // Add optional params
@@ -27,8 +27,8 @@ export default async function(
     { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
     {
       name: 'Accept',
-      value: 'application/x-www-form-urlencoded, application/json'
-    }
+      value: 'application/x-www-form-urlencoded, application/json',
+    },
   ];
 
   if (credentialsInBody) {
@@ -44,11 +44,18 @@ export default async function(
     headers,
     url,
     method: 'POST',
-    body: models.request.newBodyFormUrlEncoded(params)
+    body: models.request.newBodyFormUrlEncoded(params),
   });
 
   const statusCode = response.statusCode || 0;
-  if (statusCode < 200 || statusCode >= 300) {
+
+  if (statusCode === 401) {
+    // If the refresh token was rejected due an unauthorized request, we will
+    // return a null access_token to trigger an authentication request to fetch
+    // brand new refresh and access tokens.
+
+    return responseToObject(null, [c.P_ACCESS_TOKEN]);
+  } else if (statusCode < 200 || statusCode >= 300) {
     throw new Error(`[oauth2] Failed to refresh token url=${url} status=${statusCode}`);
   }
 
@@ -57,16 +64,21 @@ export default async function(
     throw new Error(`[oauth2] No body returned from ${url}`);
   }
 
-  const results = responseToObject(bodyBuffer.toString(), [
-    c.P_ACCESS_TOKEN,
-    c.P_REFRESH_TOKEN,
-    c.P_EXPIRES_IN,
-    c.P_TOKEN_TYPE,
-    c.P_SCOPE,
-    c.P_ERROR,
-    c.P_ERROR_URI,
-    c.P_ERROR_DESCRIPTION
-  ]);
-
-  return results;
+  return responseToObject(
+    bodyBuffer.toString(),
+    [
+      c.P_ACCESS_TOKEN,
+      c.P_REFRESH_TOKEN,
+      c.P_EXPIRES_IN,
+      c.P_TOKEN_TYPE,
+      c.P_SCOPE,
+      c.P_ERROR,
+      c.P_ERROR_URI,
+      c.P_ERROR_DESCRIPTION,
+    ],
+    {
+      // Refresh token is optional, so we'll default it to the existing value
+      [c.P_REFRESH_TOKEN]: refreshToken,
+    },
+  );
 }

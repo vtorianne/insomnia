@@ -14,10 +14,11 @@ import {
   HUGE_RESPONSE_MB,
   LARGE_RESPONSE_MB,
   PREVIEW_MODE_FRIENDLY,
-  PREVIEW_MODE_RAW
+  PREVIEW_MODE_RAW,
 } from '../../../common/constants';
-import * as hotkeys from '../../../common/hotkeys';
 import KeydownBinder from '../keydown-binder';
+import { executeHotKey } from '../../../common/hotkeys-listener';
+import { hotKeyRefs } from '../../../common/hotkeys';
 
 let alwaysShowLargeResponses = false;
 
@@ -38,13 +39,13 @@ type Props = {
 
   // Optional
   updateFilter: Function | null,
-  error: string | null
+  error: string | null,
 };
 
 type State = {
   blockingBecauseTooLarge: boolean,
   bodyBuffer: Buffer | null,
-  error: string
+  error: string,
 };
 
 @autobind
@@ -56,8 +57,14 @@ class ResponseViewer extends React.Component<Props, State> {
     this.state = {
       blockingBecauseTooLarge: false,
       bodyBuffer: null,
-      error: ''
+      error: '',
     };
+  }
+
+  refresh() {
+    if (this._selectableView != null && typeof this._selectableView.refresh === 'function') {
+      this._selectableView.refresh();
+    }
   }
 
   _decodeIconv(bodyBuffer: Buffer, charset: string): string {
@@ -93,11 +100,11 @@ class ResponseViewer extends React.Component<Props, State> {
         const bodyBuffer = props.getBody();
         this.setState({
           bodyBuffer,
-          blockingBecauseTooLarge: false
+          blockingBecauseTooLarge: false,
         });
       } catch (err) {
         this.setState({
-          error: `Failed reading response from filesystem: ${err.stack}`
+          error: `Failed reading response from filesystem: ${err.stack}`,
         });
       }
     }
@@ -174,7 +181,7 @@ class ResponseViewer extends React.Component<Props, State> {
       return;
     }
 
-    hotkeys.executeHotKey(e, hotkeys.FOCUS_RESPONSE, () => {
+    executeHotKey(e, hotKeyRefs.RESPONSE_FOCUS, () => {
       if (!this._isViewSelectable()) {
         return;
       }
@@ -198,7 +205,7 @@ class ResponseViewer extends React.Component<Props, State> {
       previewMode,
       responseId,
       updateFilter,
-      url
+      url,
     } = this.props;
 
     let contentType = this.props.contentType;

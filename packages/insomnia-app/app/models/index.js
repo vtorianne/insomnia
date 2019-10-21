@@ -21,7 +21,7 @@ export type BaseModel = {
   type: string,
   parentId: string,
   modified: number,
-  created: number
+  created: number,
 };
 
 // Reference to each model
@@ -57,12 +57,25 @@ export function all() {
     response,
     oAuth2Token,
     clientCertificate,
-    pluginData
+    pluginData,
   ];
 }
 
-export function types() {
+export function types(): Array<any> {
   return all().map(model => model.type);
+}
+
+export function canSync(d: BaseModel): boolean {
+  if ((d: any).isPrivate) {
+    return false;
+  }
+
+  const m = getModel(d.type);
+  if (!m) {
+    return false;
+  }
+
+  return m.canSync || false;
 }
 
 export function getModel(type: string): Object | null {
@@ -106,9 +119,9 @@ export async function initModel<T: BaseModel>(type: string, ...sources: Array<Ob
       type: type,
       parentId: null,
       modified: Date.now(),
-      created: Date.now()
+      created: Date.now(),
     },
-    model.init()
+    model.init(),
   );
 
   const fullObject = Object.assign({}, objectDefaults, ...sources);

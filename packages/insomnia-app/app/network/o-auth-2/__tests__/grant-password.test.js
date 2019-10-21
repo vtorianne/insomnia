@@ -12,6 +12,7 @@ const CLIENT_SECRET = 'secret_12345456677756343';
 const USERNAME = 'user';
 const PASSWORD = 'password';
 const SCOPE = 'scope_123';
+const AUDIENCE = 'https://foo.com/userinfo';
 
 describe('password', () => {
   beforeEach(globalBeforeEach);
@@ -23,8 +24,9 @@ describe('password', () => {
       JSON.stringify({
         access_token: 'token_123',
         token_type: 'token_type',
-        scope: SCOPE
-      })
+        scope: SCOPE,
+        audience: AUDIENCE,
+      }),
     );
 
     network.sendWithSettings = jest.fn(() => ({
@@ -32,7 +34,7 @@ describe('password', () => {
       bodyCompression: '',
       parentId: 'req_1',
       statusCode: 200,
-      headers: [{ name: 'Content-Type', value: 'application/json' }]
+      headers: [{ name: 'Content-Type', value: 'application/json' }],
     }));
 
     const result = await getToken(
@@ -43,86 +45,8 @@ describe('password', () => {
       CLIENT_SECRET,
       USERNAME,
       PASSWORD,
-      SCOPE
-    );
-
-    // Check the request to fetch the token
-    expect(network.sendWithSettings.mock.calls).toEqual([
-      [
-        'req_1',
-        {
-          url: ACCESS_TOKEN_URL,
-          method: 'POST',
-          body: {
-            mimeType: 'application/x-www-form-urlencoded',
-            params: [
-              { name: 'grant_type', value: 'password' },
-              { name: 'username', value: USERNAME },
-              { name: 'password', value: PASSWORD },
-              { name: 'scope', value: SCOPE }
-            ]
-          },
-          headers: [
-            {
-              name: 'Content-Type',
-              value: 'application/x-www-form-urlencoded'
-            },
-            {
-              name: 'Accept',
-              value: 'application/x-www-form-urlencoded, application/json'
-            },
-            {
-              name: 'Authorization',
-              value: 'Basic Y2xpZW50XzEyMzpzZWNyZXRfMTIzNDU0NTY2Nzc3NTYzNDM='
-            }
-          ]
-        }
-      ]
-    ]);
-
-    // Check the expected value
-    expect(result).toEqual({
-      access_token: 'token_123',
-      expires_in: null,
-      token_type: 'token_type',
-      refresh_token: null,
-      scope: SCOPE,
-      error: null,
-      error_uri: null,
-      error_description: null,
-      xResponseId: 'res_dd2ccc1a2745477a881a9e8ef9d42403'
-    });
-  });
-
-  it('gets token with urlencoded and body auth', async () => {
-    const bodyPath = path.join(getTempDir(), 'foo.response');
-
-    fs.writeFileSync(
-      bodyPath,
-      JSON.stringify({
-        access_token: 'token_123',
-        token_type: 'token_type',
-        scope: SCOPE
-      })
-    );
-
-    network.sendWithSettings = jest.fn(() => ({
-      bodyPath,
-      bodyCompression: '',
-      parentId: 'req_1',
-      statusCode: 200,
-      headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }]
-    }));
-
-    const result = await getToken(
-      'req_1',
-      ACCESS_TOKEN_URL,
-      true,
-      CLIENT_ID,
-      CLIENT_SECRET,
-      USERNAME,
-      PASSWORD,
-      SCOPE
+      SCOPE,
+      AUDIENCE,
     );
 
     // Check the request to fetch the token
@@ -139,22 +63,25 @@ describe('password', () => {
               { name: 'username', value: USERNAME },
               { name: 'password', value: PASSWORD },
               { name: 'scope', value: SCOPE },
-              { name: 'client_id', value: CLIENT_ID },
-              { name: 'client_secret', value: CLIENT_SECRET }
-            ]
+              { name: 'audience', value: AUDIENCE },
+            ],
           },
           headers: [
             {
               name: 'Content-Type',
-              value: 'application/x-www-form-urlencoded'
+              value: 'application/x-www-form-urlencoded',
             },
             {
               name: 'Accept',
-              value: 'application/x-www-form-urlencoded, application/json'
-            }
-          ]
-        }
-      ]
+              value: 'application/x-www-form-urlencoded, application/json',
+            },
+            {
+              name: 'Authorization',
+              value: 'Basic Y2xpZW50XzEyMzpzZWNyZXRfMTIzNDU0NTY2Nzc3NTYzNDM=',
+            },
+          ],
+        },
+      ],
     ]);
 
     // Check the expected value
@@ -164,10 +91,92 @@ describe('password', () => {
       token_type: 'token_type',
       refresh_token: null,
       scope: SCOPE,
+      audience: AUDIENCE,
       error: null,
       error_uri: null,
       error_description: null,
-      xResponseId: 'res_e3e96e5fdd6842298b66dee1f0940f3d'
+      xResponseId: 'res_dd2ccc1a2745477a881a9e8ef9d42403',
+    });
+  });
+
+  it('gets token with urlencoded and body auth', async () => {
+    const bodyPath = path.join(getTempDir(), 'foo.response');
+
+    fs.writeFileSync(
+      bodyPath,
+      JSON.stringify({
+        access_token: 'token_123',
+        token_type: 'token_type',
+        scope: SCOPE,
+        audience: AUDIENCE,
+      }),
+    );
+
+    network.sendWithSettings = jest.fn(() => ({
+      bodyPath,
+      bodyCompression: '',
+      parentId: 'req_1',
+      statusCode: 200,
+      headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
+    }));
+
+    const result = await getToken(
+      'req_1',
+      ACCESS_TOKEN_URL,
+      true,
+      CLIENT_ID,
+      CLIENT_SECRET,
+      USERNAME,
+      PASSWORD,
+      SCOPE,
+      AUDIENCE,
+    );
+
+    // Check the request to fetch the token
+    expect(network.sendWithSettings.mock.calls).toEqual([
+      [
+        'req_1',
+        {
+          url: ACCESS_TOKEN_URL,
+          method: 'POST',
+          body: {
+            mimeType: 'application/x-www-form-urlencoded',
+            params: [
+              { name: 'grant_type', value: 'password' },
+              { name: 'username', value: USERNAME },
+              { name: 'password', value: PASSWORD },
+              { name: 'scope', value: SCOPE },
+              { name: 'audience', value: AUDIENCE },
+              { name: 'client_id', value: CLIENT_ID },
+              { name: 'client_secret', value: CLIENT_SECRET },
+            ],
+          },
+          headers: [
+            {
+              name: 'Content-Type',
+              value: 'application/x-www-form-urlencoded',
+            },
+            {
+              name: 'Accept',
+              value: 'application/x-www-form-urlencoded, application/json',
+            },
+          ],
+        },
+      ],
+    ]);
+
+    // Check the expected value
+    expect(result).toEqual({
+      access_token: 'token_123',
+      expires_in: null,
+      token_type: 'token_type',
+      refresh_token: null,
+      scope: SCOPE,
+      audience: AUDIENCE,
+      error: null,
+      error_uri: null,
+      error_description: null,
+      xResponseId: 'res_e3e96e5fdd6842298b66dee1f0940f3d',
     });
   });
 });

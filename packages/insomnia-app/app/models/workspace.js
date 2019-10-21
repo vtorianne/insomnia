@@ -7,10 +7,11 @@ export const name = 'Workspace';
 export const type = 'Workspace';
 export const prefix = 'wrk';
 export const canDuplicate = true;
+export const canSync = true;
 
 type BaseWorkspace = {
   name: string,
-  description: string
+  description: string,
 };
 
 export type Workspace = BaseModel & BaseWorkspace;
@@ -18,7 +19,7 @@ export type Workspace = BaseModel & BaseWorkspace;
 export function init() {
   return {
     name: 'New Workspace',
-    description: ''
+    description: '',
   };
 }
 
@@ -72,7 +73,7 @@ async function _migrateExtractClientCertificates(workspace: Workspace): Promise<
       cert: cert.cert || null,
       key: cert.key || null,
       pfx: cert.pfx || null,
-      isPrivate: false
+      isPrivate: false,
     });
   }
 

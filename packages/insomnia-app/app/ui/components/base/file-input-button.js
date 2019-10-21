@@ -14,12 +14,13 @@ type Props = {
   extensions?: Array<string>,
   showFileName?: boolean,
   showFileIcon?: boolean,
-  name?: string
+  name?: string,
 };
 
 @autobind
 class FileInputButton extends React.PureComponent<Props> {
   _button: ?HTMLButtonElement;
+
   focus() {
     this._button && this._button.focus();
   }
@@ -56,7 +57,7 @@ class FileInputButton extends React.PureComponent<Props> {
           return 'openDirectory';
         }
       }),
-      filters: []
+      filters: [{ name: 'All Files', extensions: ['*'] }],
     };
 
     // If extensions are provided then filter for just those extensions

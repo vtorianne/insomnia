@@ -6,12 +6,14 @@ export const name = 'Folder';
 export const type = 'RequestGroup';
 export const prefix = 'fld';
 export const canDuplicate = true;
+export const canSync = true;
 
 type BaseRequestGroup = {
   name: string,
   description: string,
   environment: Object,
-  metaSortKey: number
+  environmentPropertyOrder: Object | null,
+  metaSortKey: number,
 };
 
 export type RequestGroup = BaseModel & BaseRequestGroup;
@@ -21,7 +23,8 @@ export function init() {
     name: 'New Folder',
     description: '',
     environment: {},
-    metaSortKey: -1 * Date.now()
+    environmentPropertyOrder: null,
+    metaSortKey: -1 * Date.now(),
   };
 }
 

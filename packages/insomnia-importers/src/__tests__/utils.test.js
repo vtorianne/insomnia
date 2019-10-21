@@ -22,7 +22,7 @@ describe('setDefaults()', () => {
       method: 'GET',
       parameters: [],
       headers: [],
-      authentication: {}
+      authentication: {},
     });
   });
 
@@ -31,7 +31,7 @@ describe('setDefaults()', () => {
       _type: 'request_group',
       parentId: '__WORKSPACE_ID__',
       name: 'Imported',
-      environment: {}
+      environment: {},
     });
   });
 
@@ -40,7 +40,25 @@ describe('setDefaults()', () => {
       _type: 'environment',
       parentId: '__BASE_ENVIRONMENT_ID__',
       name: 'Imported Environment',
-      data: {}
+      data: {},
+    });
+  });
+
+  describe('unthrowableParseJson', () => {
+    it('should parse happy json', () => {
+      const json = '{"foo": "bar"}';
+      const obj = utils.unthrowableParseJson(json);
+
+      expect(obj).toEqual({ foo: 'bar' });
+    });
+
+    it('should quietly fail on bad json', () => {
+      expect(() => {
+        const json = '{"foo": "bar';
+        const obj = utils.unthrowableParseJson(json);
+
+        expect(obj).toBeNull();
+      }).not.toThrow();
     });
   });
 });

@@ -11,7 +11,7 @@ type ThemeBlock = {
     warning?: string,
     danger?: string,
     surprise?: string,
-    info?: string
+    info?: string,
   },
   foreground?: {
     default: string,
@@ -20,7 +20,7 @@ type ThemeBlock = {
     warning?: string,
     danger?: string,
     surprise?: string,
-    info?: string
+    info?: string,
   },
   highlight?: {
     default: string,
@@ -29,35 +29,35 @@ type ThemeBlock = {
     sm?: string,
     md?: string,
     lg?: string,
-    xl?: string
-  }
+    xl?: string,
+  },
 };
 
 type ThemeInner = {
   ...ThemeBlock,
   rawCss?: string,
   styles: ?{
-    overlay?: ThemeBlock,
+    dialog?: ThemeBlock,
+    dialogFooter?: ThemeBlock,
+    dialogHeader?: ThemeBlock,
     dropdown?: ThemeBlock,
-    tooltip?: ThemeBlock,
+    editor?: ThemeBlock,
+    link?: ThemeBlock,
+    overlay?: ThemeBlock,
+    pane?: ThemeBlock,
+    paneHeader?: ThemeBlock,
     sidebar?: ThemeBlock,
     sidebarHeader?: ThemeBlock,
     sidebarList?: ThemeBlock,
-    sidebarActions?: ThemeBlock,
-    pane?: ThemeBlock,
-    paneHeader?: ThemeBlock,
-    dialog?: ThemeBlock,
-    dialogHeader?: ThemeBlock,
-    dialogFooter?: ThemeBlock,
+    tooltip?: ThemeBlock,
     transparentOverlay?: ThemeBlock,
-    link?: ThemeBlock
-  }
+  },
 };
 
 export type PluginTheme = {
   name: string,
   displayName: string,
-  theme: ThemeInner
+  theme: ThemeInner,
 };
 
 export async function generateThemeCSS(theme: PluginTheme): Promise<string> {
@@ -66,7 +66,7 @@ export async function generateThemeCSS(theme: PluginTheme): Promise<string> {
     theme.theme,
     null,
     THROW_ON_ERROR,
-    theme.name
+    theme.name,
   );
   const n = theme.name;
 
@@ -88,7 +88,7 @@ export async function generateThemeCSS(theme: PluginTheme): Promise<string> {
     css += wrapStyles(
       n,
       '.theme--transparent-overlay',
-      getThemeBlockCSS(styles.transparentOverlay)
+      getThemeBlockCSS(styles.transparentOverlay),
     );
 
     // Dialogs
@@ -107,6 +107,9 @@ export async function generateThemeCSS(theme: PluginTheme): Promise<string> {
 
     // Link
     css += wrapStyles(n, '.theme--link', getThemeBlockCSS(styles.link));
+
+    // Code Editors
+    css += wrapStyles(n, '.theme--editor', getThemeBlockCSS(styles.editor));
 
     // HACK: Dialog styles for CodeMirror dialogs too
     css += wrapStyles(n, '.CodeMirror-info', getThemeBlockCSS(styles.dialog));
@@ -191,7 +194,7 @@ function wrapStyles(theme: string, selector: string, styles: string) {
     styles,
     '}',
     '',
-    ''
+    '',
   ].join('\n');
 }
 

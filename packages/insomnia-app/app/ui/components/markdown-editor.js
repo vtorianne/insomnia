@@ -12,7 +12,7 @@ class MarkdownEditor extends PureComponent {
   constructor(props) {
     super(props);
     this.state = {
-      markdown: props.defaultValue
+      markdown: props.defaultValue,
     };
   }
 
@@ -47,73 +47,48 @@ class MarkdownEditor extends PureComponent {
       handleRender,
       handleGetRenderContext,
       nunjucksPowerUserMode,
-      isVariableUncovered
+      isVariableUncovered,
     } = this.props;
 
     const { markdown } = this.state;
 
     const classes = classnames('react-tabs', 'markdown-editor', 'outlined', className, {
-      'markdown-editor--dynamic-height': !tall
+      'markdown-editor--dynamic-height': !tall,
     });
 
     return (
       <Tabs className={classes} defaultIndex={defaultPreviewMode ? 1 : 0}>
         <TabList>
-          <Tab>
+          <Tab tabIndex="-1">
             <Button value="Write">Write</Button>
           </Tab>
-          <Tab>
+          <Tab tabIndex="-1">
             <Button value="Preview">Preview</Button>
           </Tab>
         </TabList>
         <TabPanel className="react-tabs__tab-panel markdown-editor__edit">
           <div className="form-control form-control--outlined">
-            {isVariableUncovered && (
-              <CodeEditor
-                ref={this._setEditorRef}
-                hideGutters
-                hideLineNumbers
-                dynamicHeight={!tall}
-                manualPrettify
-                noStyleActiveLine
-                mode={mode || 'text/x-markdown'}
-                placeholder={placeholder}
-                debounceMillis={300}
-                keyMap={keyMap}
-                fontSize={fontSize}
-                lineWrapping={lineWrapping}
-                indentSize={indentSize}
-                defaultValue={markdown}
-                render={handleRender}
-                getRenderContext={handleGetRenderContext}
-                nunjucksPowerUserMode={nunjucksPowerUserMode}
-                isVariableUncovered={isVariableUncovered}
-                onChange={this._handleChange}
-              />
-            )}
-            {!isVariableUncovered && (
-              <CodeEditor
-                ref={this._setEditorRef}
-                hideGutters
-                hideLineNumbers
-                dynamicHeight={!tall}
-                manualPrettify
-                noStyleActiveLine
-                mode={mode || 'text/x-markdown'}
-                placeholder={placeholder}
-                debounceMillis={300}
-                keyMap={keyMap}
-                fontSize={fontSize}
-                lineWrapping={lineWrapping}
-                indentSize={indentSize}
-                defaultValue={markdown}
-                render={handleRender}
-                getRenderContext={handleGetRenderContext}
-                nunjucksPowerUserMode={nunjucksPowerUserMode}
-                isVariableUncovered={isVariableUncovered}
-                onChange={this._handleChange}
-              />
-            )}
+            <CodeEditor
+              ref={this._setEditorRef}
+              hideGutters
+              hideLineNumbers
+              dynamicHeight={!tall}
+              manualPrettify
+              noStyleActiveLine
+              mode={mode || 'text/x-markdown'}
+              placeholder={placeholder}
+              debounceMillis={300}
+              keyMap={keyMap}
+              fontSize={fontSize}
+              lineWrapping={lineWrapping}
+              indentSize={indentSize}
+              defaultValue={markdown}
+              render={handleRender}
+              getRenderContext={handleGetRenderContext}
+              nunjucksPowerUserMode={nunjucksPowerUserMode}
+              isVariableUncovered={isVariableUncovered}
+              onChange={this._handleChange}
+            />
           </div>
           <div className="txt-sm italic faint">Styling with Markdown is supported</div>
         </TabPanel>
@@ -143,7 +118,7 @@ MarkdownEditor.propTypes = {
   defaultPreviewMode: PropTypes.bool,
   className: PropTypes.string,
   mode: PropTypes.string,
-  tall: PropTypes.bool
+  tall: PropTypes.bool,
 };
 
 export default MarkdownEditor;

@@ -6,7 +6,7 @@ describe('hasAuthHeader()', () => {
   it('finds valid header', () => {
     const yes = misc.hasAuthHeader([
       { name: 'foo', value: 'bar' },
-      { name: 'authorization', value: 'foo' }
+      { name: 'authorization', value: 'foo' },
     ]);
 
     expect(yes).toEqual(true);
@@ -15,7 +15,7 @@ describe('hasAuthHeader()', () => {
   it('finds valid header case insensitive', () => {
     const yes = misc.hasAuthHeader([
       { name: 'foo', value: 'bar' },
-      { name: 'AuthOrizAtiOn', value: 'foo' }
+      { name: 'AuthOrizAtiOn', value: 'foo' },
     ]);
 
     expect(yes).toEqual(true);
@@ -45,7 +45,7 @@ describe('filterHeaders()', () => {
     expect(misc.filterHeaders(null, 'good')).toEqual([]);
     expect(misc.filterHeaders([{ name: 'good', value: 'valid' }], null)).toEqual([]);
     expect(misc.filterHeaders([{ name: 'good', value: 'valid' }], 'good')).toEqual([
-      { name: 'good', value: 'valid' }
+      { name: 'good', value: 'valid' },
     ]);
   });
 });
@@ -77,8 +77,8 @@ describe('keyedDebounce()', () => {
       {
         foo: ['bar3'],
         baz: ['bar'],
-        multi: ['foo', 'bar', 'baz']
-      }
+        multi: ['foo', 'bar', 'baz'],
+      },
     ]);
   });
 });
@@ -116,13 +116,13 @@ describe('fuzzyMatch()', () => {
     expect(misc.fuzzyMatch('test', 'testing')).toEqual({
       score: -3,
       indexes: [0, 1, 2, 3],
-      target: 'testing'
+      target: 'testing',
     });
 
     expect(misc.fuzzyMatch('tst', 'testing')).toEqual({
       score: -2004,
       indexes: [0, 2, 3],
-      target: 'testing'
+      target: 'testing',
     });
   });
 
@@ -141,27 +141,27 @@ describe('fuzzyMatchAll()', () => {
     expect(misc.fuzzyMatchAll('test', ['testing', 'foo'])).toEqual({
       score: -3,
       indexes: [0, 1, 2, 3],
-      target: 'testing foo'
+      target: 'testing foo',
     });
     expect(misc.fuzzyMatchAll('test foo', ['testing', 'foo'], { splitSpace: true })).toEqual({
       score: 0,
       indexes: [0, 1, 2, 3, 0, 1, 2],
-      target: 'testing foo'
+      target: 'testing foo',
     });
     expect(misc.fuzzyMatchAll('tst', ['testing'])).toEqual({
       score: -2004,
       indexes: [0, 2, 3],
-      target: 'testing'
+      target: 'testing',
     });
     expect(
       misc.fuzzyMatch('tst  this ou', 'testing this out', {
         splitSpace: true,
-        loose: true
-      })
+        loose: true,
+      }),
     ).toEqual({
       score: -20,
       indexes: [0, 2, 3, 8, 9, 10, 11, 13, 14],
-      target: 'testing this out'
+      target: 'testing this out',
     });
   });
 
@@ -169,5 +169,27 @@ describe('fuzzyMatchAll()', () => {
     expect(misc.fuzzyMatchAll('foo', [undefined])).toEqual(null);
     expect(misc.fuzzyMatchAll('foo', ['bar'])).toEqual(null);
     expect(misc.fuzzyMatchAll('wrong this ou', ['testing', 'this', 'out'])).toEqual(null);
+  });
+});
+
+describe('chunkArray()', () => {
+  it('works with exact divisor', () => {
+    const chunks = misc.chunkArray([1, 2, 3, 4, 5, 6], 3);
+    expect(chunks).toEqual([[1, 2, 3], [4, 5, 6]]);
+  });
+
+  it('works with weird divisor', () => {
+    const chunks = misc.chunkArray([1, 2, 3, 4, 5, 6], 4);
+    expect(chunks).toEqual([[1, 2, 3, 4], [5, 6]]);
+  });
+
+  it('works with empty', () => {
+    const chunks = misc.chunkArray([], 4);
+    expect(chunks).toEqual([]);
+  });
+
+  it('works with less than one chunk', () => {
+    const chunks = misc.chunkArray([1, 2], 4);
+    expect(chunks).toEqual([[1, 2]]);
   });
 });

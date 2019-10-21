@@ -1,5 +1,4 @@
 // @flow
-import type { RequestAuthentication } from '../../../../models/request';
 
 import classnames from 'classnames';
 import * as React from 'react';
@@ -9,14 +8,15 @@ import HelpTooltip from '../../help-tooltip';
 import { showModal } from '../../modals';
 import CodePromptModal from '../../modals/code-prompt-modal';
 import Button from '../../base/button';
+import type { Request, RequestAuthentication } from '../../../../models/request';
 
 type Props = {
-  authentication: RequestAuthentication,
+  request: Request,
   handleRender: Function,
   handleGetRenderContext: Function,
   nunjucksPowerUserMode: boolean,
   isVariableUncovered: boolean,
-  onChange: Function
+  onChange: (Request, RequestAuthentication) => Promise<Request>,
 };
 
 const PRIVATE_KEY_PLACEHOLDER = `
@@ -35,45 +35,45 @@ cJV+wRTs/Szp6LXAgMmTkKMJ+9XXErUIUgwbl27Y3Rv/9ox1p5VRg+A=
 @autobind
 class AsapAuth extends React.PureComponent<Props> {
   _handleDisable() {
-    const { authentication } = this.props;
-    authentication.disabled = !authentication.disabled;
-    this.props.onChange(authentication);
+    const { request, onChange } = this.props;
+    onChange(request, {
+      ...request.authentication,
+      disabled: !request.authentication.disabled,
+    });
   }
 
   _handleChangeProperty(property: string, value: string | boolean): void {
-    const { authentication } = this.props;
-    authentication[property] = value;
-    this.props.onChange(authentication);
+    const { request, onChange } = this.props;
+    onChange(request, { ...request.authentication, [property]: value });
   }
 
   _handleChangePrivateKey(value: string): void {
-    const { authentication } = this.props;
-    authentication.privateKey = value;
-    this.props.onChange(authentication);
+    const { request, onChange } = this.props;
+    onChange(request, { ...request.authentication, privateKey: value });
   }
 
   renderAsapAuthenticationFields(): React.Node {
     const asapIssuer = this.renderTextInput('Issuer (iss)', 'issuer', 'text/plain', value =>
-      this._handleChangeProperty('issuer', value)
+      this._handleChangeProperty('issuer', value),
     );
 
     const asapSubject = this.renderTextInput('Subject (sub)', 'subject', 'text/plain', value =>
-      this._handleChangeProperty('subject', value)
+      this._handleChangeProperty('subject', value),
     );
 
     const asapAudience = this.renderTextInput('Audience (aud)', 'audience', 'text/plain', value =>
-      this._handleChangeProperty('audience', value)
+      this._handleChangeProperty('audience', value),
     );
 
     const asapAdditionalClaims = this.renderTextInput(
       'Additional Claims',
       'additionalClaims',
       'application/json',
-      value => this._handleChangeProperty('additionalClaims', value)
+      value => this._handleChangeProperty('additionalClaims', value),
     );
 
     const asapKeyId = this.renderTextInput('Key ID (kid)', 'keyId', 'text/plain', value =>
-      this._handleChangeProperty('keyId', value)
+      this._handleChangeProperty('keyId', value),
     );
 
     const asapPrivateKey = this.renderPrivateKeyInput('Private Key');
@@ -85,16 +85,19 @@ class AsapAuth extends React.PureComponent<Props> {
     label: string,
     property: string,
     mode: string,
-    onChange: Function
+    onChange: Function,
   ): React.Element<*> {
     const {
       handleRender,
       handleGetRenderContext,
-      authentication,
+      request,
       nunjucksPowerUserMode,
-      isVariableUncovered
+      isVariableUncovered,
     } = this.props;
+
+    const { authentication } = request;
     const id = label.replace(/ /g, '-');
+
     return (
       <tr key={id}>
         <td className="pad-right no-wrap valign-middle">
@@ -105,7 +108,7 @@ class AsapAuth extends React.PureComponent<Props> {
         <td className="wide">
           <div
             className={classnames('form-control form-control--underlined no-margin', {
-              'form-control--inactive': authentication.disabled
+              'form-control--inactive': authentication.disabled,
             })}>
             <OneLineEditor
               id={id}
@@ -124,7 +127,10 @@ class AsapAuth extends React.PureComponent<Props> {
   }
 
   _handleEditPrivateKey() {
-    const { handleRender, handleGetRenderContext, authentication } = this.props;
+    const { handleRender, handleGetRenderContext, request } = this.props;
+
+    const { authentication } = request;
+
     showModal(CodePromptModal, {
       submitName: 'Done',
       title: `Edit Private Key`,
@@ -133,13 +139,14 @@ class AsapAuth extends React.PureComponent<Props> {
       enableRender: handleRender || handleGetRenderContext,
       placeholder: PRIVATE_KEY_PLACEHOLDER,
       mode: 'text/plain',
-      hideMode: true
+      hideMode: true,
     });
   }
 
   renderPrivateKeyInput(label: string): React.Element<*> {
+    const { authentication } = this.props.request;
     const id = label.replace(/ /g, '-');
-    const { authentication } = this.props;
+
     return (
       <tr key={id}>
         <td className="pad-right pad-top-sm no-wrap valign-top">
@@ -156,8 +163,8 @@ class AsapAuth extends React.PureComponent<Props> {
             className={classnames(
               'form-control form-control--underlined form-control--tall no-margin',
               {
-                'form-control--inactive': authentication.disabled
-              }
+                'form-control--inactive': authentication.disabled,
+              },
             )}>
             <button className="btn btn--clicky wide" onClick={this._handleEditPrivateKey}>
               <i className="fa fa-edit space-right" />
@@ -170,8 +177,8 @@ class AsapAuth extends React.PureComponent<Props> {
   }
 
   render() {
+    const { authentication } = this.props.request;
     const fields = this.renderAsapAuthenticationFields();
-    const { authentication } = this.props;
 
     return (
       <div className="pad">

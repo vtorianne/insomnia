@@ -32,7 +32,7 @@ type Props = {
   render: Function,
   getRenderContext: Function,
   nunjucksPowerUserMode: boolean,
-  isVariableUncovered: boolean
+  isVariableUncovered: boolean,
 };
 
 type State = {
@@ -40,14 +40,17 @@ type State = {
   isValid: boolean,
   subEnvironments: Array<Environment>,
   rootEnvironment: Environment | null,
-  selectedEnvironmentId: string | null
+  selectedEnvironmentId: string | null,
 };
 
 const SidebarListItem = SortableElement(
   ({ environment, activeEnvironment, showEnvironment, changeEnvironmentName }) => {
     const classes = classnames({
       'env-modal__sidebar-item': true,
-      'env-modal__sidebar-item--active': activeEnvironment === environment
+      'env-modal__sidebar-item--active': activeEnvironment === environment,
+
+      // Specify theme because dragging will pull it out to <body>
+      'theme--dialog': true,
     });
 
     return (
@@ -74,7 +77,7 @@ const SidebarListItem = SortableElement(
         </Button>
       </li>
     );
-  }
+  },
 );
 
 const SidebarList = SortableContainer(
@@ -91,7 +94,7 @@ const SidebarList = SortableContainer(
         />
       ))}
     </ul>
-  )
+  ),
 );
 
 @autobind
@@ -109,7 +112,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
       isValid: true,
       subEnvironments: [],
       rootEnvironment: null,
-      selectedEnvironmentId: null
+      selectedEnvironmentId: null,
     };
 
     this.colorChangeTimeout = null;
@@ -167,7 +170,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
       workspace,
       rootEnvironment,
       subEnvironments,
-      selectedEnvironmentId
+      selectedEnvironmentId,
     });
   }
 
@@ -182,7 +185,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
     const parentId = rootEnvironment._id;
     const environment = await models.environment.create({
       parentId,
-      isPrivate
+      isPrivate,
     });
     await this._load(workspace, environment);
   }
@@ -202,6 +205,12 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
     await this._load(workspace, environment);
   }
 
+  async _handleDuplicateEnvironment(environment: Environment) {
+    const { workspace } = this.state;
+    const newEnvironment = await models.environment.duplicate(environment);
+    this._load(workspace, newEnvironment);
+  }
+
   async _handleDeleteEnvironment(environment: Environment) {
     const { rootEnvironment, workspace } = this.state;
 
@@ -215,7 +224,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
     await this._load(workspace, rootEnvironment);
   }
 
-  async _handleChangeEnvironmentName(environment: Environment, name: string) {
+  async _updateEnvironment(environment: Environment, patch: Object, refresh: boolean = true) {
     const { workspace } = this.state;
 
     // NOTE: Fetch the environment first because it might not be up to date.
@@ -226,16 +235,21 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
       return;
     }
 
-    await models.environment.update(realEnvironment, { name });
-    await this._load(workspace);
+    await models.environment.update(realEnvironment, patch);
+
+    if (refresh) {
+      await this._load(workspace);
+    }
+  }
+
+  async _handleChangeEnvironmentName(environment: Environment, name: string) {
+    await this._updateEnvironment(environment, { name });
   }
 
   _handleChangeEnvironmentColor(environment: Environment, color: string | null) {
     clearTimeout(this.colorChangeTimeout);
     this.colorChangeTimeout = setTimeout(async () => {
-      const { workspace } = this.state;
-      await models.environment.update(environment, { color });
-      await this._load(workspace);
+      await this._updateEnvironment(environment, { color });
     }, DEBOUNCE_MILLIS);
   }
 
@@ -270,7 +284,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
         const [
           _, // eslint-disable-line no-unused-vars
           doc,
-          fromSync
+          fromSync,
         ] = change;
 
         // Force an editor refresh if any changes from sync come in
@@ -285,7 +299,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
   async _handleSortEnd(results: {
     oldIndex: number,
     newIndex: number,
-    collection: Array<Environment>
+    collection: Array<Environment>,
   }) {
     const { oldIndex, newIndex } = results;
     if (newIndex === oldIndex) {
@@ -301,7 +315,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
     db.bufferChanges();
     for (let i = 0; i < newSubEnvironments.length; i++) {
       const environment = newSubEnvironments[i];
-      await models.environment.update(environment, { metaSortKey: i });
+      await this._updateEnvironment(environment, { metaSortKey: i }, false);
     }
     db.flushChanges();
   }
@@ -342,9 +356,13 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
       return;
     }
 
-    let data;
+    let patch;
     try {
-      data = this.environmentEditorRef.getValue();
+      const data = this.environmentEditorRef.getValue();
+      patch = {
+        data: data && data.object,
+        dataPropertyOrder: data && data.propertyOrder,
+      };
     } catch (err) {
       // Invalid JSON probably
       return;
@@ -354,8 +372,8 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
 
     if (activeEnvironment) {
       clearTimeout(this.saveTimeout);
-      this.saveTimeout = setTimeout(() => {
-        models.environment.update(activeEnvironment, { data });
+      this.saveTimeout = setTimeout(async () => {
+        await this._updateEnvironment(activeEnvironment, patch);
       }, DEBOUNCE_MILLIS * 4);
     }
   }
@@ -369,12 +387,17 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
       render,
       getRenderContext,
       nunjucksPowerUserMode,
-      isVariableUncovered
+      isVariableUncovered,
     } = this.props;
 
     const { subEnvironments, rootEnvironment, isValid } = this.state;
 
     const activeEnvironment = this._getActiveEnvironment();
+
+    const environmentInfo = {
+      object: activeEnvironment ? activeEnvironment.data : {},
+      propertyOrder: activeEnvironment && activeEnvironment.dataPropertyOrder,
+    };
 
     return (
       <Modal ref={this._setModalRef} wide tall {...this.props}>
@@ -383,7 +406,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
           <div className="env-modal__sidebar">
             <li
               className={classnames('env-modal__sidebar-root-item', {
-                'env-modal__sidebar-item--active': activeEnvironment === rootEnvironment
+                'env-modal__sidebar-item--active': activeEnvironment === rootEnvironment,
               })}>
               <Button onClick={this._handleShowEnvironment} value={rootEnvironment}>
                 {ROOT_ENVIRONMENT_NAME}
@@ -441,39 +464,46 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
               </h1>
 
               {activeEnvironment && rootEnvironment !== activeEnvironment ? (
-                <Dropdown className="space-right" right>
-                  <DropdownButton className="btn btn--clicky">
-                    {activeEnvironment.color && (
-                      <i
-                        className="fa fa-circle space-right"
-                        style={{ color: activeEnvironment.color }}
-                      />
-                    )}
-                    Color <i className="fa fa-caret-down" />
-                  </DropdownButton>
+                <React.Fragment>
+                  <Dropdown className="space-right" right>
+                    <DropdownButton className="btn btn--clicky">
+                      {activeEnvironment.color && (
+                        <i
+                          className="fa fa-circle space-right"
+                          style={{ color: activeEnvironment.color }}
+                        />
+                      )}
+                      Color <i className="fa fa-caret-down" />
+                    </DropdownButton>
 
-                  <DropdownItem value={activeEnvironment} onClick={this._handleClickColorChange}>
-                    <i className="fa fa-circle" style={{ color: activeEnvironment.color }} />
-                    {activeEnvironment.color ? 'Change Color' : 'Assign Color'}
-                  </DropdownItem>
+                    <DropdownItem value={activeEnvironment} onClick={this._handleClickColorChange}>
+                      <i className="fa fa-circle" style={{ color: activeEnvironment.color }} />
+                      {activeEnvironment.color ? 'Change Color' : 'Assign Color'}
+                    </DropdownItem>
 
-                  <DropdownItem
+                    <DropdownItem
+                      value={activeEnvironment}
+                      onClick={this._handleUnsetColor}
+                      disabled={!activeEnvironment.color}>
+                      <i className="fa fa-minus-circle" />
+                      Unset Color
+                    </DropdownItem>
+                  </Dropdown>
+
+                  <Button
                     value={activeEnvironment}
-                    onClick={this._handleUnsetColor}
-                    disabled={!activeEnvironment.color}>
-                    <i className="fa fa-minus-circle" />
-                    Unset Color
-                  </DropdownItem>
-                </Dropdown>
-              ) : null}
+                    onClick={this._handleDuplicateEnvironment}
+                    className="btn btn--clicky space-right">
+                    <i className="fa fa-copy" /> Duplicate
+                  </Button>
 
-              {activeEnvironment && rootEnvironment !== activeEnvironment ? (
-                <PromptButton
-                  value={activeEnvironment}
-                  onClick={this._handleDeleteEnvironment}
-                  className="btn btn--clicky">
-                  <i className="fa fa-trash-o" />
-                </PromptButton>
+                  <PromptButton
+                    value={activeEnvironment}
+                    onClick={this._handleDeleteEnvironment}
+                    className="btn btn--clicky">
+                    <i className="fa fa-trash-o" />
+                  </PromptButton>
+                </React.Fragment>
               ) : null}
             </div>
             <div className="env-modal__editor">
@@ -484,7 +514,7 @@ class WorkspaceEnvironmentsEditModal extends React.PureComponent<Props, State> {
                 lineWrapping={lineWrapping}
                 ref={this._setEditorRef}
                 key={`${this.editorKey}::${activeEnvironment ? activeEnvironment._id : 'n/a'}`}
-                environment={activeEnvironment ? activeEnvironment.data : {}}
+                environmentInfo={environmentInfo}
                 didChange={this._didChange}
                 render={render}
                 getRenderContext={getRenderContext}
