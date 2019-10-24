@@ -4,7 +4,7 @@
   "description": "This module takes WADL xml input text and extracts request information, returning it as a js object.  It is designed with REST API testing in mind.",
   "main": "index.js",
   "dependencies": {
-    "xml2js": "^0.4.19"
+    "xml2js": "^0.4.22"
   },
   "devDependencies": {},
   "scripts": {
