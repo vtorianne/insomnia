@@ -39,7 +39,7 @@ module.exports.parseQueryFormBody = function(param, context, defaultVal) {
       context.body.params = [];
     }
     if (!defaultVal) {
-      defaultVal = simpleType.generateDefault(param.$.type);
+      defaultVal = simpleType.generateDefault(param.$.type || '');
     }
     context.body.params.push({ name: param.$.name, value: defaultVal });
   } catch (err) {
