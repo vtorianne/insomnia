@@ -12,7 +12,9 @@ var crossReferences = {
 module.exports.parse = async function(wadl, callback) {
   await xml2js.Parser().parseString(wadl, function(err, result) {
     if (err) {
-      console.log('PARSING ERROR: ', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('PARSING ERROR: ', err);
+      }
       callback(null);
     } else {
       callback(parseApplication(result.application));
@@ -45,7 +47,9 @@ function setUpCrossReferences(application) {
       }
     }
   } catch (err) {
-    console.log('SET UP CROSS REFERENCES ERROR: ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('SET UP CROSS REFERENCES ERROR: ', err);
+    }
   }
 }
 
@@ -58,7 +62,9 @@ function parseApplication(application) {
     //note: according to WADL specs, should be 1 & only 1 resources element
     return parseResources(application.resources[0]);
   } catch (err) {
-    console.log('APPLICATION ERROR: ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('APPLICATION ERROR: ', err);
+    }
     return null;
   }
 }
@@ -67,7 +73,9 @@ function parseGrammars(grammars) {
   try {
     if (grammars.schema) xmlSchema.init(grammars.schema[0]);
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('GRAMMARS ERROR: ', err);
+    }
   }
 }
 
@@ -90,7 +98,9 @@ function parseResources(resources) {
     result.requests = [].concat.apply([], result.requests);
     return result;
   } catch (err) {
-    console.log('RESOURCES ERROR:   ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('RESOURCES ERROR:   ', err);
+    }
     return null;
   }
 }
@@ -137,7 +147,9 @@ function parseResource(resource, context) {
     //flatten nested arrays into single dimension array of requests
     return [].concat.apply([], requests);
   } catch (err) {
-    console.log('RESOURCE ERROR:    ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('RESOURCE ERROR:    ', err);
+    }
     return null;
   }
 }
@@ -168,7 +180,9 @@ function parseResourceType(resourceType, context, resource) {
     }
     return;
   } catch (err) {
-    console.log('RESOURCE TYPE ERROR: ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('RESOURCE TYPE ERROR: ', err);
+    }
   }
 }
 
@@ -236,7 +250,9 @@ function parseParam(param, context, parent) {
       return;
     }
   } catch (err) {
-    console.log('PARAM ERROR:    ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('PARAM ERROR:    ', err);
+    }
   }
 }
 
@@ -244,7 +260,9 @@ function parseOption(option) {
   try {
     return option.$.value;
   } catch (err) {
-    console.log('OPTION ERROR:  ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('OPTION ERROR:  ', err);
+    }
     return null;
   }
 }
@@ -266,7 +284,9 @@ function parseMethod(method, context) {
       return parseRequest(method.request[0], context);
     }
   } catch (err) {
-    console.log('METHOD ERROR:    ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('METHOD ERROR:    ', err);
+    }
     return null;
   }
 }
@@ -286,7 +306,9 @@ function parseRequest(request, context) {
     }
     return context;
   } catch (err) {
-    console.log('REQUEST ERROR:    ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('REQUEST ERROR:    ', err);
+    }
     return null;
   }
 }
@@ -323,6 +345,8 @@ function parseRepresentation(representation, context) {
       return;
     }
   } catch (err) {
-    console.log('REPRESENTATION ERROR:    ', err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('REPRESENTATION ERROR:    ', err);
+    }
   }
 }

@@ -46,6 +46,8 @@ module.exports.generateDefault = function(type) {
       return 'string';
     }
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };

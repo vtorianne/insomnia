@@ -12,7 +12,9 @@ module.exports.parseMatrix = function(param, context, defaultVal) {
       context.url += '=' + defaultVal;
     }
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -26,7 +28,9 @@ module.exports.parseHeader = function(param, context) {
     }
     context.headers.push(header);
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -43,7 +47,9 @@ module.exports.parseQueryFormBody = function(param, context, defaultVal) {
     }
     context.body.params.push({ name: param.$.name, value: defaultVal });
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -57,7 +63,9 @@ module.exports.parseQueryURI = function(param, context, defaultVal) {
     }
     context.parameters.push({ name: param.$.name, value: defaultVal });
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -68,7 +76,9 @@ module.exports.parseTemplate = function(param, context, defaultVal) {
     }
     context.url = context.url.replace('{' + param.$.name + '}', param.$.name + '_' + defaultVal);
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -90,7 +100,9 @@ module.exports.parseJSON = function(param, context) {
       context.body.text = JSON.stringify(newObj);
     }
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -103,7 +115,9 @@ module.exports.parseXML = function(param, context) {
     var xmlBuilder = new xml2js.Builder({ renderOpts: { pretty: false } });
     context.body.text = xmlBuilder.buildObject(obj);
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 

@@ -9,7 +9,9 @@ module.exports.init = function(schema) {
     parseSchema(schema);
     initialized = true;
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -27,7 +29,9 @@ module.exports.generateDefault = function(schemaElem) {
     }
     return {};
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 };
 
@@ -55,7 +59,9 @@ function parseComplexType(complexType) {
       return {};
     }
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
   }
 }
 
@@ -67,7 +73,9 @@ function parseAll(all) {
     }
     return obj;
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
     return {};
   }
 }
@@ -80,7 +88,9 @@ function parseSequence(sequence) {
     }
     return arr;
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
     return [];
   }
 }
@@ -100,7 +110,9 @@ function parseElement(element) {
     obj[element.$.name] = defaultVal;
     return obj;
   } catch (err) {
-    console.log(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(err);
+    }
     return {};
   }
 }

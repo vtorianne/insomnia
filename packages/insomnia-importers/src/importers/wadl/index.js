@@ -35,7 +35,6 @@ function formatResources(resources) {
     resources_obj = resources_obj.concat(resources.requests);
     return resources_obj;
   } catch (err) {
-    console.log('FORMATTING ERROR: ', err);
     return null;
   }
 }
