@@ -105,11 +105,12 @@ function parseResource(resource, context) {
     }
     //handle type attribute i.e. resource_type
     if (resource.$.hasOwnProperty('type')) {
-      var resource_types = resource.$.type.split(',');
+      var resource_types = resource.$.type.split(' '); //type field is space delimited
       for (var i = 0; i < resource_types.length; ++i) {
         var id = resource_types[i].split('#')[1];
         if (crossReferences.resource_types[id]) {
-          requests.push(parseResourceType(crossReferences.resource_types[id], context));
+          //updates the context and resource objects by reference to apply the resource type
+          parseResourceType(crossReferences.resource_types[id], context, resource);
         }
       }
     }
@@ -119,18 +120,18 @@ function parseResource(resource, context) {
         parseParam(resource.param[i], context, { type: 'resource' });
       }
     }
-    //handle sub-resources
-    if (resource.hasOwnProperty('resource')) {
-      for (var i = 0; i < resource.resource.length; ++i) {
-        //sub-resources only inherit URI context - no headers or query params
-        requests.push(parseResource(resource.resource[i], { url: context.url }));
-      }
-    }
     //parse methods
     if (resource.hasOwnProperty('method')) {
       for (var i = 0; i < resource.method.length; ++i) {
         //have separate copies of context obj so by reference updates don't mess up parsing
         requests.push(parseMethod(resource.method[i], Object.assign({}, context)));
+      }
+    }
+    //handle sub-resources
+    if (resource.hasOwnProperty('resource')) {
+      for (var i = 0; i < resource.resource.length; ++i) {
+        //sub-resources only inherit URI context - no headers or query params
+        requests.push(parseResource(resource.resource[i], { url: context.url }));
       }
     }
     //flatten nested arrays into single dimension array of requests
@@ -141,30 +142,33 @@ function parseResource(resource, context) {
   }
 }
 
-function parseResourceType(resourceType, context) {
+function parseResourceType(resourceType, context, resource) {
   try {
-    var requests = [];
+    //update the context object with the param info for resources of this resourceType
     if (resourceType.hasOwnProperty('param')) {
       for (var i = 0; i < resourceType.param.length; ++i) {
         parseParam(resourceType.param[i], context, { type: 'resource_type' });
       }
     }
-    if (resourceType.hasOwnProperty('resource')) {
-      for (var i = 0; i < resourceType.resource.length; ++i) {
-        //sub-resources only inherit URI context - no headers or query params
-        requests.push(parseResource(resourceType.resource[i], { url: context.url }));
-      }
-    }
+    //add methods to the resource object's method field
     if (resourceType.hasOwnProperty('method')) {
-      for (var i = 0; i < resourceType.method.length; ++i) {
-        //have separate copies of context obj so by reference updates don't mess up parsing
-        requests.push(parseMethod(resourceType.method[i], Object.assign({}, context)));
+      if (resource.hasOwnProperty('method')) {
+        resource.method = resource.method.concat(resourceType.method);
+      } else {
+        resource.method = resourceType.method;
       }
     }
-    return [].concat.apply([], requests);
+    //add subresources to the resource object's resource field
+    if (resourceType.hasOwnProperty('resource')) {
+      if (resource.hasOwnProperty('resource')) {
+        resource.resource = resource.resource.concat(resourceType.resource);
+      } else {
+        resource.resource = resourceType.resource;
+      }
+    }
+    return;
   } catch (err) {
     console.log('RESOURCE TYPE ERROR: ', err);
-    return null;
   }
 }
 

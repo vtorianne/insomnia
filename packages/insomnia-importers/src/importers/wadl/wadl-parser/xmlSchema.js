@@ -13,20 +13,6 @@ module.exports.init = function(schema) {
   }
 };
 
-function parseSchema(schema) {
-  if (schema.complexType) {
-    for (var i = 0; i < schema.complexType.length; ++i) {
-      //create hash map with type name as key and complex type obj as value
-      rootComplexTypes[schema.complexType[i].$.name] = schema.complexType[i];
-    }
-  }
-  if (schema.element) {
-    for (var i = 0; i < schema.element.length; ++i) {
-      rootElements[schema.element[i].$.name] = schema.element[i];
-    }
-  }
-}
-
 //check for root level elements
 module.exports.generateDefault = function(schemaElem) {
   try {
@@ -44,6 +30,20 @@ module.exports.generateDefault = function(schemaElem) {
     console.log(err);
   }
 };
+
+function parseSchema(schema) {
+  if (schema.complexType) {
+    for (var i = 0; i < schema.complexType.length; ++i) {
+      //create hash map with type name as key and complex type obj as value
+      rootComplexTypes[schema.complexType[i].$.name] = schema.complexType[i];
+    }
+  }
+  if (schema.element) {
+    for (var i = 0; i < schema.element.length; ++i) {
+      rootElements[schema.element[i].$.name] = schema.element[i];
+    }
+  }
+}
 
 function parseComplexType(complexType) {
   try {
@@ -87,7 +87,6 @@ function parseSequence(sequence) {
 
 function parseElement(element) {
   try {
-    console.log(element);
     var obj = {};
     var defaultVal;
     if (element.complexType) {
