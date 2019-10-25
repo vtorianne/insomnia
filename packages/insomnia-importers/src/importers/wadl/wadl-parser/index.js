@@ -1,12 +1,12 @@
-var xml2js = require('xml2js');
-var paramHelper = require('./paramHelper');
-var xmlSchema = require('./xmlSchema');
+const xml2js = require('xml2js');
+const paramHelper = require('./paramHelper');
+const xmlSchema = require('./xmlSchema');
 
-var crossReferences = {
+let crossReferences = {
   methods: {},
   representations: {},
   params: {},
-  resource_types: {}
+  resource_types: {},
 };
 
 module.exports.parse = async function(wadl, callback) {
@@ -25,23 +25,23 @@ module.exports.parse = async function(wadl, callback) {
 function setUpCrossReferences(application) {
   try {
     if (application.method) {
-      for (var i = 0; i < application.method.length; ++i) {
+      for (let i = 0; i < application.method.length; ++i) {
         crossReferences.methods[application.method[i].$.id] = application.method[i];
       }
     }
     if (application.representation) {
-      for (var i = 0; i < application.representation.length; ++i) {
+      for (let i = 0; i < application.representation.length; ++i) {
         crossReferences.representations[application.representation[i].$.id] =
           application.representation[i];
       }
     }
     if (application.param) {
-      for (var i = 0; i < application.param.length; ++i) {
+      for (let i = 0; i < application.param.length; ++i) {
         crossReferences.params[application.param[i].$.id] = application.param[i];
       }
     }
     if (application.resource_type) {
-      for (var i = 0; i < application.resource_type.length; ++i) {
+      for (let i = 0; i < application.resource_type.length; ++i) {
         crossReferences.resource_types[application.resource_type[i].$.id] =
           application.resource_type[i];
       }
@@ -59,7 +59,7 @@ function parseApplication(application) {
     if (application.grammars) {
       parseGrammars(application.grammars[0]);
     }
-    //note: according to WADL specs, should be 1 & only 1 resources element
+    // note: according to WADL specs, should be 1 & only 1 resources element
     return parseResources(application.resources[0]);
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
@@ -81,20 +81,20 @@ function parseGrammars(grammars) {
 
 function parseResources(resources) {
   try {
-    //return obj
-    var result = {
+    // return obj
+    let result = {
       base: resources.$.base,
-      requests: []
+      requests: [],
     };
-    //context for parsing resources
-    var context = {
-      url: resources.$.base
+    // context for parsing resources
+    let context = {
+      url: resources.$.base,
     };
-    for (var i = 0; i < resources.resource.length; ++i) {
-      //have separate copies of context obj so by-reference updates don't mess up parsing
+    for (let i = 0; i < resources.resource.length; ++i) {
+      // have separate copies of context obj so by-reference updates don't mess up parsing
       result.requests.push(parseResource(resources.resource[i], Object.assign({}, context)));
     }
-    //flatten nested arrays into single dimension array of requests
+    // flatten nested arrays into single dimension array of requests
     result.requests = [].concat.apply([], result.requests);
     return result;
   } catch (err) {
@@ -107,44 +107,44 @@ function parseResources(resources) {
 
 function parseResource(resource, context) {
   try {
-    var requests = [];
-    //update context url
+    let requests = [];
+    // update context url
     if (resource.$.hasOwnProperty('path')) {
       if (!context.url.endsWith('/')) context.url += '/';
       context.url += resource.$.path;
     }
-    //handle type attribute i.e. resource_type
+    // handle type attribute i.e. resource_type
     if (resource.$.hasOwnProperty('type')) {
-      var resource_types = resource.$.type.split(' '); //type field is space delimited
-      for (var i = 0; i < resource_types.length; ++i) {
-        var id = resource_types[i].split('#')[1];
+      let resourceTypes = resource.$.type.split(' '); // type field is space delimited
+      for (let i = 0; i < resourceTypes.length; ++i) {
+        let id = resourceTypes[i].split('#')[1];
         if (crossReferences.resource_types[id]) {
-          //updates the context and resource objects by reference to apply the resource type
+          // updates the context and resource objects by reference to apply the resource type
           parseResourceType(crossReferences.resource_types[id], context, resource);
         }
       }
     }
-    //parse params
+    // parse params
     if (resource.hasOwnProperty('param')) {
-      for (var i = 0; i < resource.param.length; ++i) {
+      for (let i = 0; i < resource.param.length; ++i) {
         parseParam(resource.param[i], context, { type: 'resource' });
       }
     }
-    //parse methods
+    // parse methods
     if (resource.hasOwnProperty('method')) {
-      for (var i = 0; i < resource.method.length; ++i) {
-        //have separate copies of context obj so by reference updates don't mess up parsing
+      for (let i = 0; i < resource.method.length; ++i) {
+        // have separate copies of context obj so by reference updates don't mess up parsing
         requests.push(parseMethod(resource.method[i], Object.assign({}, context)));
       }
     }
-    //handle sub-resources
+    // handle sub-resources
     if (resource.hasOwnProperty('resource')) {
-      for (var i = 0; i < resource.resource.length; ++i) {
-        //sub-resources only inherit URI context - no headers or query params
+      for (let i = 0; i < resource.resource.length; ++i) {
+        // sub-resources only inherit URI context - no headers or query params
         requests.push(parseResource(resource.resource[i], { url: context.url }));
       }
     }
-    //flatten nested arrays into single dimension array of requests
+    // flatten nested arrays into single dimension array of requests
     return [].concat.apply([], requests);
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
@@ -156,13 +156,13 @@ function parseResource(resource, context) {
 
 function parseResourceType(resourceType, context, resource) {
   try {
-    //update the context object with the param info for resources of this resourceType
+    // update the context object with the param info for resources of this resourceType
     if (resourceType.hasOwnProperty('param')) {
-      for (var i = 0; i < resourceType.param.length; ++i) {
+      for (let i = 0; i < resourceType.param.length; ++i) {
         parseParam(resourceType.param[i], context, { type: 'resource_type' });
       }
     }
-    //add methods to the resource object's method field
+    // add methods to the resource object's method field
     if (resourceType.hasOwnProperty('method')) {
       if (resource.hasOwnProperty('method')) {
         resource.method = resource.method.concat(resourceType.method);
@@ -170,7 +170,7 @@ function parseResourceType(resourceType, context, resource) {
         resource.method = resourceType.method;
       }
     }
-    //add subresources to the resource object's resource field
+    // add subresources to the resource object's resource field
     if (resourceType.hasOwnProperty('resource')) {
       if (resource.hasOwnProperty('resource')) {
         resource.resource = resource.resource.concat(resourceType.resource);
@@ -186,12 +186,12 @@ function parseResourceType(resourceType, context, resource) {
   }
 }
 
-//context is an object, so it is passed by reference, thus changes will be reflected in caller function
+// context is an object, so it is passed by reference, thus changes will be reflected in caller function
 function parseParam(param, context, parent) {
   try {
     if (param.$.href) {
-      //handle reference param
-      var id = param.$.href.split('#')[1];
+      // handle reference param
+      let id = param.$.href.split('#')[1];
       if (crossReferences.params[id]) {
         parseParam(crossReferences.params[id], context, parent);
       }
@@ -215,10 +215,10 @@ function parseParam(param, context, parent) {
           break;
         case 'query':
           if (parent.type === 'representation') {
-            //parse as form body params
+            // parse as form body params
             paramHelper.parseQueryFormBody(param, context, defaultVal);
           } else {
-            //parse as URI query params
+            // parse as URI query params
             paramHelper.parseQueryURI(param, context, defaultVal);
           }
           break;
@@ -240,7 +240,7 @@ function parseParam(param, context, parent) {
                 paramHelper.parseXML(param, context);
                 break;
               default:
-                //handle text/* media types
+                // handle text/* media types
                 if (parent.mediaType.startsWith('text')) {
                   paramHelper.parseText(param, context);
                 }
@@ -270,16 +270,16 @@ function parseOption(option) {
 function parseMethod(method, context) {
   try {
     if (method.$.href) {
-      //handle reference method
-      var id = method.$.href.split('#')[1];
+      // handle reference method
+      let id = method.$.href.split('#')[1];
       if (crossReferences.methods[id]) {
         return parseMethod(crossReferences.methods[id], context);
       } else {
-        throw 'Invalid method reference';
+        throw new Error('Invalid method reference');
       }
     } else {
       context.method = method.$.name;
-      //handle simple requests (e.g. GET) that don't require further specification
+      // handle simple requests (e.g. GET) that don't require further specification
       if (!method.request) return context;
       return parseRequest(method.request[0], context);
     }
@@ -294,13 +294,13 @@ function parseMethod(method, context) {
 function parseRequest(request, context) {
   try {
     if (request.hasOwnProperty('param')) {
-      for (var i = 0; i < request.param.length; ++i) {
+      for (let i = 0; i < request.param.length; ++i) {
         parseParam(request.param[i], context, { type: 'request' });
       }
     }
 
     if (request.hasOwnProperty('representation')) {
-      for (var i = 0; i < request.representation.length; ++i) {
+      for (let i = 0; i < request.representation.length; ++i) {
         parseRepresentation(request.representation[i], context);
       }
     }
@@ -313,12 +313,12 @@ function parseRequest(request, context) {
   }
 }
 
-//context is an object, so it is passed by reference, thus changes will be reflected in caller function
+// context is an object, so it is passed by reference, thus changes will be reflected in caller function
 function parseRepresentation(representation, context) {
   try {
     if (representation.$.href) {
-      //handle reference representation
-      var id = representation.$.href.split('#')[1];
+      // handle reference representation
+      let id = representation.$.href.split('#')[1];
       if (crossReferences.representations[id]) {
         parseRepresentation(crossReferences.representations[id], context);
       }
@@ -335,10 +335,10 @@ function parseRepresentation(representation, context) {
         context.headers.push({ name: 'Content-Type', value: representation.$.mediaType });
       }
       if (representation.hasOwnProperty('param')) {
-        for (var i = 0; i < representation.param.length; ++i) {
+        for (let i = 0; i < representation.param.length; ++i) {
           parseParam(representation.param[i], context, {
             type: 'representation',
-            mediaType: representation.$.mediaType
+            mediaType: representation.$.mediaType,
           });
         }
       }
