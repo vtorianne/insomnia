@@ -50,6 +50,7 @@ function setUpCrossReferences(application) {
     if (process.env.NODE_ENV === 'development') {
       console.log('SET UP CROSS REFERENCES ERROR: ', err);
     }
+    throw err;
   }
 }
 
@@ -76,6 +77,7 @@ function parseGrammars(grammars) {
     if (process.env.NODE_ENV === 'development') {
       console.log('GRAMMARS ERROR: ', err);
     }
+    throw err;
   }
 }
 
@@ -92,7 +94,8 @@ function parseResources(resources) {
     };
     for (let i = 0; i < resources.resource.length; ++i) {
       // have separate copies of context obj so by-reference updates don't mess up parsing
-      result.requests.push(parseResource(resources.resource[i], Object.assign({}, context)));
+      let childContext = JSON.parse(JSON.stringify(context));
+      result.requests.push(parseResource(resources.resource[i], childContext));
     }
     // flatten nested arrays into single dimension array of requests
     result.requests = [].concat.apply([], result.requests);
@@ -134,7 +137,8 @@ function parseResource(resource, context) {
     if (resource.hasOwnProperty('method')) {
       for (let i = 0; i < resource.method.length; ++i) {
         // have separate copies of context obj so by reference updates don't mess up parsing
-        requests.push(parseMethod(resource.method[i], Object.assign({}, context)));
+        let childContext = JSON.parse(JSON.stringify(context));
+        requests.push(parseMethod(resource.method[i], childContext));
       }
     }
     // handle sub-resources
@@ -183,6 +187,7 @@ function parseResourceType(resourceType, context, resource) {
     if (process.env.NODE_ENV === 'development') {
       console.log('RESOURCE TYPE ERROR: ', err);
     }
+    throw err;
   }
 }
 
@@ -253,6 +258,7 @@ function parseParam(param, context, parent) {
     if (process.env.NODE_ENV === 'development') {
       console.log('PARAM ERROR:    ', err);
     }
+    throw err;
   }
 }
 
@@ -348,5 +354,6 @@ function parseRepresentation(representation, context) {
     if (process.env.NODE_ENV === 'development') {
       console.log('REPRESENTATION ERROR:    ', err);
     }
+    throw err;
   }
 }

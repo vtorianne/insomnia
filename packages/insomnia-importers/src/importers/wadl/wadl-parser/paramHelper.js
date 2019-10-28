@@ -15,6 +15,7 @@ module.exports.parseMatrix = function(param, context, defaultVal) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -31,6 +32,7 @@ module.exports.parseHeader = function(param, context) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -50,6 +52,7 @@ module.exports.parseQueryFormBody = function(param, context, defaultVal) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -66,6 +69,7 @@ module.exports.parseQueryURI = function(param, context, defaultVal) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -79,6 +83,7 @@ module.exports.parseTemplate = function(param, context, defaultVal) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -103,6 +108,7 @@ module.exports.parseJSON = function(param, context) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -118,6 +124,7 @@ module.exports.parseXML = function(param, context) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 

@@ -12,6 +12,7 @@ module.exports.init = function(schema) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -32,6 +33,7 @@ module.exports.generateDefault = function(schemaElem) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
 
@@ -62,6 +64,7 @@ function parseComplexType(complexType) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    return {};
   }
 }
 

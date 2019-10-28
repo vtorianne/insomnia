@@ -49,5 +49,6 @@ module.exports.generateDefault = function(type) {
     if (process.env.NODE_ENV === 'development') {
       console.log(err);
     }
+    throw err;
   }
 };
