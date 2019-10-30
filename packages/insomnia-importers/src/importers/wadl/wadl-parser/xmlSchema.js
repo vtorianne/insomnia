@@ -38,13 +38,13 @@ module.exports.generateDefault = function(schemaElem) {
 };
 
 function parseSchema(schema) {
-  if (schema.complexType) {
+  if (schema.hasOwnProperty('complexType')) {
     for (let i = 0; i < schema.complexType.length; ++i) {
       // create hash map with type name as key and complex type obj as value
       rootComplexTypes[schema.complexType[i].$.name] = schema.complexType[i];
     }
   }
-  if (schema.element) {
+  if (schema.hasOwnProperty('element')) {
     for (let i = 0; i < schema.element.length; ++i) {
       rootElements[schema.element[i].$.name] = schema.element[i];
     }
@@ -53,9 +53,9 @@ function parseSchema(schema) {
 
 function parseComplexType(complexType) {
   try {
-    if (complexType.all) {
+    if (complexType.hasOwnProperty('all')) {
       return parseAll(complexType.all[0]);
-    } else if (complexType.sequence) {
+    } else if (complexType.hasOwnProperty('sequence')) {
       return parseSequence(complexType.sequence[0]);
     } else {
       return {};
@@ -100,15 +100,20 @@ function parseSequence(sequence) {
 
 function parseElement(element) {
   try {
+    if (element.$.name === undefined) {
+      throw new Error('Invalid element');
+    }
     let obj = {};
     let defaultVal;
-    if (element.complexType) {
+    if (element.hasOwnProperty('complexType')) {
       defaultVal = parseComplexType(element.complexType[0]);
-    } else if (element.$.type.startsWith('xs')) {
-      defaultVal = simpleType.generateDefault(element.$.type);
+    } else if (element.$.type === undefined) {
+      defaultVal = simpleType.generateDefault('');
     } else if (element.$.type.startsWith('tns')) {
       let typeObj = rootComplexTypes[element.$.type.split(':')[1]];
       defaultVal = typeObj ? parseComplexType(typeObj) : {};
+    } else if (element.$.type.startsWith('xs')) {
+      defaultVal = simpleType.generateDefault(element.$.type);
     }
     obj[element.$.name] = defaultVal;
     return obj;

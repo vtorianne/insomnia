@@ -7,7 +7,7 @@ module.exports.parseMatrix = function(param, context, defaultVal) {
     context.url += ';' + param.$.name;
     if (param.$.type !== 'xsd:boolean' || param.$.type !== 'xs:boolean') {
       if (!defaultVal) {
-        defaultVal = simpleType.generateDefault(param.$.type);
+        defaultVal = simpleType.generateDefault(param.$.type || '');
       }
       context.url += '=' + defaultVal;
     }
@@ -62,7 +62,7 @@ module.exports.parseQueryURI = function(param, context, defaultVal) {
       context.parameters = [];
     }
     if (!defaultVal) {
-      defaultVal = simpleType.generateDefault(param.$.type);
+      defaultVal = simpleType.generateDefault(param.$.type || '');
     }
     context.parameters.push({ name: param.$.name, value: defaultVal });
   } catch (err) {
@@ -76,7 +76,7 @@ module.exports.parseQueryURI = function(param, context, defaultVal) {
 module.exports.parseTemplate = function(param, context, defaultVal) {
   try {
     if (!defaultVal) {
-      defaultVal = simpleType.generateDefault(param.$.type);
+      defaultVal = simpleType.generateDefault(param.$.type || '');
     }
     context.url = context.url.replace('{' + param.$.name + '}', param.$.name + '_' + defaultVal);
   } catch (err) {
@@ -93,11 +93,11 @@ module.exports.parseText = function(param, context) {
 
 module.exports.parseJSON = function(param, context) {
   try {
-    let obj = generateObj(param.$.name, param.$.type);
-    if (!context.body) {
+    let obj = generateObj(param.$.name, param.$.type || '');
+    if (!context.hasOwnProperty('body')) {
       context.body = {};
     }
-    if (!context.body.text) {
+    if (!context.body.hasOwnProperty('text')) {
       context.body.text = JSON.stringify(obj);
     } else {
       let oldObj = JSON.parse(context.body.text);
@@ -114,8 +114,8 @@ module.exports.parseJSON = function(param, context) {
 
 module.exports.parseXML = function(param, context) {
   try {
-    let obj = generateObj(param.$.name, param.$.type);
-    if (!context.body) {
+    let obj = generateObj(param.$.name, param.$.type || '');
+    if (!context.hasOwnProperty('body')) {
       context.body = {};
     }
     let xmlBuilder = new xml2js.Builder({ renderOpts: { pretty: false } });

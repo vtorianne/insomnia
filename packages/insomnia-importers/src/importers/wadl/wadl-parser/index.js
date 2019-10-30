@@ -17,30 +17,34 @@ module.exports.parse = async function(wadl, callback) {
       }
       callback(null);
     } else {
-      callback(parseApplication(result.application));
+      if (result.hasOwnProperty('application')) {
+        callback(parseApplication(result.application));
+      } else {
+        callback(null);
+      }
     }
   });
 };
 
 function setUpCrossReferences(application) {
   try {
-    if (application.method) {
+    if (application.hasOwnProperty('method')) {
       for (let i = 0; i < application.method.length; ++i) {
         crossReferences.methods[application.method[i].$.id] = application.method[i];
       }
     }
-    if (application.representation) {
+    if (application.hasOwnProperty('representation')) {
       for (let i = 0; i < application.representation.length; ++i) {
         crossReferences.representations[application.representation[i].$.id] =
           application.representation[i];
       }
     }
-    if (application.param) {
+    if (application.hasOwnProperty('param')) {
       for (let i = 0; i < application.param.length; ++i) {
         crossReferences.params[application.param[i].$.id] = application.param[i];
       }
     }
-    if (application.resource_type) {
+    if (application.hasOwnProperty('resource_type')) {
       for (let i = 0; i < application.resource_type.length; ++i) {
         crossReferences.resource_types[application.resource_type[i].$.id] =
           application.resource_type[i];
@@ -57,7 +61,7 @@ function setUpCrossReferences(application) {
 function parseApplication(application) {
   try {
     setUpCrossReferences(application);
-    if (application.grammars) {
+    if (application.hasOwnProperty('grammars')) {
       parseGrammars(application.grammars[0]);
     }
     // note: according to WADL specs, should be 1 & only 1 resources element
@@ -72,7 +76,7 @@ function parseApplication(application) {
 
 function parseGrammars(grammars) {
   try {
-    if (grammars.schema) xmlSchema.init(grammars.schema[0]);
+    if (grammars.hasOwnProperty('schema')) xmlSchema.init(grammars.schema[0]);
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
       console.log('GRAMMARS ERROR: ', err);
@@ -194,7 +198,7 @@ function parseResourceType(resourceType, context, resource) {
 // context is an object, so it is passed by reference, thus changes will be reflected in caller function
 function parseParam(param, context, parent) {
   try {
-    if (param.$.href) {
+    if (param.$.hasOwnProperty('href')) {
       // handle reference param
       let id = param.$.href.split('#')[1];
       if (crossReferences.params[id]) {
@@ -202,10 +206,13 @@ function parseParam(param, context, parent) {
       }
       return;
     } else {
+      if (param.$.name === undefined) {
+        throw new Error('Invalid param');
+      }
       let defaultVal = null;
-      if (param.$.default) {
+      if (param.$.hasOwnProperty('default')) {
         defaultVal = param.$.default;
-      } else if (param.$.fixed) {
+      } else if (param.$.hasOwnProperty('fixed')) {
         defaultVal = param.$.fixed;
       } else if (param.hasOwnProperty('option')) {
         defaultVal = parseOption(param.option[0]);
@@ -275,7 +282,7 @@ function parseOption(option) {
 
 function parseMethod(method, context) {
   try {
-    if (method.$.href) {
+    if (method.$.hasOwnProperty('href')) {
       // handle reference method
       let id = method.$.href.split('#')[1];
       if (crossReferences.methods[id]) {
@@ -322,7 +329,7 @@ function parseRequest(request, context) {
 // context is an object, so it is passed by reference, thus changes will be reflected in caller function
 function parseRepresentation(representation, context) {
   try {
-    if (representation.$.href) {
+    if (representation.$.hasOwnProperty('href')) {
       // handle reference representation
       let id = representation.$.href.split('#')[1];
       if (crossReferences.representations[id]) {
